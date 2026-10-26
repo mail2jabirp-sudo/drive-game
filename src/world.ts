@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { createTownMaterials, texturedBox } from './materials';
 
 export interface Collider { minX: number; maxX: number; minZ: number; maxZ: number }
 export const PICKUP = new THREE.Vector3(72, 0, -12);
@@ -15,20 +16,12 @@ export function createWorld(scene: THREE.Scene): {
   const root = new THREE.Group();
   root.name = 'Kottakkal town';
   scene.add(root);
-  const materials = new Map<string, THREE.MeshStandardMaterial>();
-  const mat = (color: string, roughness = 0.9) => {
-    const key = color + roughness;
-    let material = materials.get(key);
-    if (!material) {
-      material = new THREE.MeshStandardMaterial({ color, roughness });
-      materials.set(key, material);
-    }
-    return material;
-  };
+  const mat = createTownMaterials();
   const cube = new THREE.BoxGeometry(1, 1, 1);
   const box = (x: number, y: number, z: number, w: number, h: number, d: number,
     color: string, parent: THREE.Object3D = root, shadow = false) => {
-    const mesh = new THREE.Mesh(cube, mat(color));
+    const material = mat(color);
+    const mesh = new THREE.Mesh(material.map ? texturedBox(w, h, d, material.userData.tileMetres) : cube, material);
     mesh.position.set(x, y, z);
     mesh.scale.set(w, h, d);
     mesh.castShadow = shadow;
@@ -120,11 +113,26 @@ export function createWorld(scene: THREE.Scene): {
         box(side * (w / 2 + 0.04), yy, zz, 0.09, 1.65, 1.65, '#547b7a', group);
       }
     }
+    // Worn plinth, shutter grooves, window mullions and modest utility fittings.
+    box(0, 0.3, d / 2 + 0.035, w, 0.6, 0.10, '#8f9288', group);
+    for (let yy = 0.8; yy < 2.8; yy += 0.17) box(0, yy, d / 2 + 0.08, w * 0.35, 0.025, 0.03, '#4b5954', group);
+    for (const side of [-1, 1]) {
+      box(side * w * 0.31, 1.8, d / 2 + 0.11, w * 0.2, 0.06, 0.04, '#c2bda9', group);
+      box(side * (w / 2 - 0.4), 2.2, d / 2 + 0.13, 0.12, 3.8, 0.12, '#7e8179', group);
+    }
+    box(w * 0.4, 2.4, d / 2 + 0.15, 0.5, 0.65, 0.14, '#898d81', group);
     sign(name, subtitle, '#265b54', w * 0.93, 2.0, 0, 4.75, d / 2 + 0.08, group);
     if (roof) {
       const mesh = new THREE.Mesh(new THREE.ConeGeometry(1, 2.4, 4), mat('#b76545'));
       mesh.rotation.y = Math.PI / 4; mesh.scale.set((w + 2) / Math.SQRT2, 1, (d + 2) / Math.SQRT2);
       mesh.position.y = h + 1.1; mesh.castShadow = true; group.add(mesh);
+      const roofUv = mesh.geometry.getAttribute('uv');
+      for (let i = 0; i < roofUv.count; i++) roofUv.setXY(i, roofUv.getX(i) * w / 1.5, roofUv.getY(i) * d / 3);
+      // Thin fascia/eave details ground the roof rather than leaving a plain pyramid.
+      for (const side of [-1, 1]) {
+        box(side * (w / 2 + 0.8), h - 0.03, 0, 0.16, 0.2, d + 1.6, '#6c5745', group);
+        box(0, h - 0.03, side * (d / 2 + 0.8), w + 1.6, 0.2, 0.16, '#6c5745', group);
+      }
     } else {
       box(0, h + 0.22, 0, w + 0.7, 0.42, d + 0.7, '#f2e4c7', group);
       box(-w * 0.25, h + 1.0, -d * 0.22, 2, 1.5, 2, '#617c7a', group);
@@ -163,11 +171,38 @@ export function createWorld(scene: THREE.Scene): {
     const trunk = cylinder(0, h / 2, 0, 0.29, 0.47, h, '#987251', group, 7);
     trunk.rotation.z = Math.sin(phase) * 0.06;
     const topX = -Math.sin(trunk.rotation.z) * h / 2;
-    for (let i = 0; i < 7; i++) {
-      const angle = i / 7 * Math.PI * 2 + phase;
-      const leaf = new THREE.Mesh(new THREE.ConeGeometry(0.70, 5.4, 4), mat(i % 2 ? '#4e8055' : '#648b54'));
-      leaf.position.set(topX + Math.cos(angle) * 1.9, h - 0.1, Math.sin(angle) * 1.9);
-      leaf.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), new THREE.Vector3(Math.cos(angle), -0.18, Math.sin(angle)).normalize());
+    for (let yy = 1; yy < h - 0.5; yy += 0.65) {
+      const ridge = cylinder(-Math.sin(trunk.rotation.z) * (yy - h / 2), yy, 0, 0.31, 0.34, 0.055, '#75634e', group, 8);
+      ridge.rotation.z = trunk.rotation.z;
+    }
+    // Paired tapering leaflets follow a curved rachis, with a drooping coconut silhouette.
+    for (let i = 0; i < 9; i++) {
+      const angle = i / 9 * Math.PI * 2 + phase;
+      const positions: number[] = [], uvs: number[] = [];
+      const length = 4.5 + (i % 3) * 0.4;
+      const point = (t: number, lateral: number) => new THREE.Vector3(
+        topX + Math.cos(angle) * t * length - Math.sin(angle) * lateral,
+        h + 0.6 + Math.sin(t * Math.PI) * 0.9 - t * t * 2.5,
+        Math.sin(angle) * t * length + Math.cos(angle) * lateral,
+      );
+      const triangle = (a: THREE.Vector3, b: THREE.Vector3, c: THREE.Vector3) => {
+        positions.push(...a.toArray(), ...b.toArray(), ...c.toArray());
+        uvs.push(0, 0, 1, 0, 0.5, 1);
+      };
+      for (let n = 0; n < 12; n++) {
+        const t = 0.05 + n / 13;
+        const a = point(t, 0), b = point(Math.min(1, t + 0.08), 0);
+        const spread = Math.sin(t * Math.PI) * 0.8 + 0.15;
+        triangle(a, b, point(Math.min(1, t + 0.13), spread));
+        triangle(b, a, point(Math.min(1, t + 0.13), -spread));
+      }
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+      geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+      geometry.computeVertexNormals();
+      const leafMaterial = mat(i % 2 ? '#3e6340' : '#506c3e');
+      leafMaterial.side = THREE.DoubleSide;
+      const leaf = new THREE.Mesh(geometry, leafMaterial);
       leaf.castShadow = true; group.add(leaf);
     }
     for (let n = 0; n < 3; n++) cylinder(topX + n * 0.22 - 0.2, h - 0.5, 0.2, 0.22, 0.22, 0.4, '#7a7148', group, 6);
@@ -175,7 +210,7 @@ export function createWorld(scene: THREE.Scene): {
     return group;
   }
   [[86,-55],[86,10],[86,43],[-85,-54],[-84,43],[-58,-41],[58,41],[49,15],[-49,15],[-29,-45],[36,-45],[-6,46],[-37,4],[29,9],[5,-32]].forEach(([x,z],i)=>palm(x,z,11+i%3,i));
-  const shrubGeometry = new THREE.IcosahedronGeometry(1, 0);
+  const shrubGeometry = new THREE.SphereGeometry(1, 7, 5);
   function shrub(x: number, z: number, size = 1.6) {
     const mesh = new THREE.Mesh(shrubGeometry, mat('#6d8c54'));
     mesh.position.set(x, size * 0.65, z); mesh.scale.set(size, size * 0.85, size);
@@ -265,12 +300,12 @@ export function createWorld(scene: THREE.Scene): {
   // Soft low-poly Western Ghats horizon.
   for (let i = 0; i < 17; i++) {
     const angle = i / 17 * Math.PI * 2;
-    const hill = new THREE.Mesh(new THREE.IcosahedronGeometry(1, 1), mat(i % 2 ? '#8fa98c' : '#9cb394'));
+    const hill = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 10), mat(i % 2 ? '#8fa98c' : '#9cb394'));
     hill.position.set(Math.cos(angle) * 260, 12, Math.sin(angle) * 255);
     hill.scale.set(75 + i % 3 * 12, 35 + i % 4 * 10, 72); root.add(hill);
   }
   const cloudMaterial = mat('#f1edda');
-  const cloudGeometry = new THREE.IcosahedronGeometry(1, 1);
+  const cloudGeometry = new THREE.SphereGeometry(1, 10, 7);
   for (let i = 0; i < 9; i++) for (let j = 0; j < 3; j++) {
     const cloud = new THREE.Mesh(cloudGeometry, cloudMaterial);
     cloud.position.set(-160 + i * 44 + j * 8, 75 + i % 3 * 10 + j % 2 * 2, -140 - i % 2 * 70);
