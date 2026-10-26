@@ -1,6 +1,8 @@
-# Kottakkal Drive 3D
+# EN 3D — എന്റെ നാട്
 
-A small, stylized browser auto-rickshaw game inspired by Kottakkal, Malappuram, Kerala. The neighbourhood is fictional: it is not a real street map. All scenery, signs, vehicle geometry and audio are generated locally. No paid assets, accounts, API keys or runtime network requests are needed.
+**Kerala Open World Simulator**
+
+A browser auto-rickshaw simulator in development, starting with a small Kottakkal-inspired practice area. Phase 1 improves the original game with more grounded materials, vegetation and morning lighting. It remains procedural, approximate artwork; it is not photorealistic. The neighbourhood is fictional: it is not a real street map. All scenery, signs, vehicle geometry and audio are generated locally. No paid assets, accounts, API keys or runtime network requests are needed.
 
 ## Develop
 
@@ -11,7 +13,7 @@ npm ci --cache .npm-cache
 npm run dev
 ```
 
-Use the existing checkout. Each cloud task already has an isolated environment; do not create an extra Git worktree. Vite listens on port 5173 (or the next free port). Access the server using your development environment's supported browser connection. WebGL2 and hardware acceleration are recommended. A small-screen device gets touch controls; landscape gives more room to see the road. Slow renderers automatically use lower resolution and turn off shadows.
+Use the existing checkout. Each cloud task already has an isolated environment; do not create an extra Git worktree. Vite listens on port 5173 (or the next free port). Access the server using your development environment's supported browser connection. WebGL2 and hardware acceleration are recommended. A small-screen device gets touch controls; landscape gives more room to see the road. Open **Display** in the top toolbar to choose **Auto** or **Battery saver**. Auto reduces resolution, shadows and vegetation detail after sustained slow frames. Battery saver applies those reductions immediately; the preference is saved separately from gameplay. No smooth-framerate claim is made for every device.
 
 ```sh
 npm run build       # strict TypeScript checking + production output in dist/
@@ -42,7 +44,11 @@ Earnings, completed trips, tea-break count, active passenger, position and headi
 ## Project map
 
 - `src/main.ts`: scene lifecycle, chase camera, mission markers and HUD
-- `src/world.ts`: generated town, scenery and collision bounds
+- `src/world.ts`: original practice loop, town and collision bounds
+- `src/materials.ts`: original repeating asphalt, concrete, clay, earth and plaster textures
+- `src/landscape.ts`: distance-culled scenery chunks and instanced vegetation
+- `src/atmosphere.ts`: morning sky gradient
+- `src/graphics.ts`: graphics preference and performance fallback rules
 - `src/vehicle.ts`: generated rickshaw and animation
 - `src/driving.ts`: independent driving/collision model
 - `src/input.ts`: keyboard and simultaneous pointer controls
@@ -50,14 +56,17 @@ Earnings, completed trips, tea-break count, active passenger, position and headi
 - `src/audio.ts`: user-gesture initialized synthesized engine/horn
 - `src/style.css`, `index.html`: responsive interface
 
-## Small next steps
+## Current scope and next increment
 
-1. **Done:** tea-shop interaction at Chaya Kada (₹10, with saved tea-break count).
-2. A few slow vehicles following the existing loop, then simple collision avoidance.
-3. A second passenger destination and a choice of fares.
-4. A short Manjeri road spur; expand toward Perinthalmanna after the loop is stable.
+The existing road layout and all mission/tea/spawn locations are preserved. The loop is **fictional** and does not reproduce Kottakkal's real junctions or bus stand. The new paddy plots, rubber/banana groves and pond are scenic surrounds outside the current driving boundary. Landmark-like shops and bus shelter remain generic approximations. Roads remain flat in this increment; drivable slopes and bridges require a later terrain/driving update.
 
-Implement and verify one small feature at a time. `PROGRESS.md` records checkpoints and outstanding work so another session can resume without guessing.
+Phase 1 adds worn road/plaster/roof materials, improved coconut fronds, planted countryside, distance-based scenery detail and softer morning light. Driving, camera, passenger mission, wallet, tea stops and original saves remain supported. The legacy `kottakkal-drive.v1` storage key is intentionally retained; rebranding does not reset saves.
+
+**Next recommended increment: Phase 2**, a small reproducible OpenStreetMap road-data import for Kottakkal, with provenance, attribution and a separate route entry that leaves the working practice loop available. No OSM data or online map services are used yet. See [ROADMAP.md](ROADMAP.md) for data/licensing and staged acceptance criteria.
+
+Still pending: real Kottakkal/Manjeri/Kozhikode roads, geographic landmarks, drivable slopes/streams/bridges, traffic and signals, red-light/one-way/wrong-way/speed detection, fines and saved violation history, additional vehicle types, rain/cloudy/night/evening modes and town expansion. There are no traffic penalties in the current build. Those checks are **not applicable yet**, rather than passed tests.
+
+Implement and verify one small feature at a time. `PROGRESS.md` records checkpoints so another session can resume without guessing.
 
 ## Licensing
 

@@ -1,6 +1,9 @@
 import * as THREE from 'three';
 import './style.css';
 import { createWorld, PICKUP, DROPOFF, SPAWN } from './world';
+import { createLandscape } from './landscape';
+import { createAtmosphere } from './atmosphere';
+import { DISPLAY_KEY, GraphicsBudget, parseGraphicsMode } from './graphics';
 import { createRickshaw } from './vehicle';
 import { advanceCar, blocked } from './driving';
 import type { DriveState } from './driving';
@@ -50,21 +53,23 @@ try {
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.18;
+  renderer.toneMappingExposure = 0.92;
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color('#b8d9d4');
-  scene.fog = new THREE.Fog('#b8d9d4', 100, 340);
+  scene.background = new THREE.Color('#dfe5df');
+  scene.fog = new THREE.Fog('#dfe5df', 130, 400);
+  createAtmosphere(scene);
   const camera = new THREE.PerspectiveCamera(52, 1, 0.1, 600);
-  scene.add(new THREE.HemisphereLight('#fff4d4', '#667e5c', 2.5));
-  const sun = new THREE.DirectionalLight('#ffe1ad', 3.3);
+  scene.add(new THREE.HemisphereLight('#d8e5ef', '#5b6650', 1.55));
+  const sun = new THREE.DirectionalLight('#fff0d8', 2.5);
   sun.position.set(-55, 85, 35);
   sun.castShadow = true;
   sun.shadow.mapSize.set(1024, 1024);
-  sun.shadow.camera.left = -135; sun.shadow.camera.right = 135;
-  sun.shadow.camera.top = 125; sun.shadow.camera.bottom = -125;
+  sun.shadow.camera.left = -48; sun.shadow.camera.right = 48;
+  sun.shadow.camera.top = 48; sun.shadow.camera.bottom = -48;
   sun.shadow.camera.near = 0.5; sun.shadow.camera.far = 240;
   sun.shadow.normalBias = 0.045;
-  scene.add(sun);
+  scene.add(sun, sun.target);
+  const landscape = createLandscape(scene);
   const world = createWorld(scene);
   const rickshaw = createRickshaw();
   scene.add(rickshaw.group);
@@ -207,7 +212,7 @@ try {
     ctx.strokeStyle = '#b7bba7'; ctx.lineWidth = 1; ctx.setLineDash([3, 4]);
     ctx.strokeRect(sx(-72), sz(-62), 144 * 0.91, 124 * 0.91); ctx.setLineDash([]);
     ctx.font = 'bold 10px sans-serif'; ctx.textAlign = 'center';
-    ctx.fillStyle = '#75816a'; ctx.fillText('KOTTAKKAL', w / 2, h / 2 - 3); ctx.font = '9px sans-serif'; ctx.fillText('TOWN LOOP', w / 2, h / 2 + 11);
+    ctx.fillStyle = '#75816a'; ctx.fillText('KOTTAKKAL', w / 2, h / 2 - 3); ctx.font = '9px sans-serif'; ctx.fillText('PRACTICE LOOP', w / 2, h / 2 + 11);
     ctx.fillStyle = '#c97645'; ctx.beginPath(); ctx.arc(sx(TEA_STOP.x), sz(TEA_STOP.z), 4, 0, Math.PI * 2); ctx.fill();
     ctx.beginPath(); ctx.arc(sx(target().x), sz(target().z), 6, 0, Math.PI * 2);
     ctx.fillStyle = progress.phase === 'pickup' ? '#e9a52b' : '#198c7c'; ctx.fill();
@@ -242,24 +247,34 @@ try {
   }
   let last: number | undefined;
   let hudClock = 0;
-  let slowFrames = 0;
-  let reducedQuality = false;
+  let displayMode = parseGraphicsMode(null);
+  try { displayMode = parseGraphicsMode(localStorage.getItem(DISPLAY_KEY)); } catch { /* Use Auto when storage is unavailable. */ }
+  const graphics = new GraphicsBudget(displayMode);
+  const qualitySelect = element<HTMLSelectElement>('quality-select');
+  qualitySelect.value = graphics.mode;
+  function applyGraphics(): void {
+    renderer.setPixelRatio(graphics.lowDetail ? Math.min(window.devicePixelRatio, 0.85) : Math.min(window.devicePixelRatio, 1.5));
+    renderer.shadowMap.enabled = !graphics.lowDetail;
+    landscape.setLowDetail(graphics.lowDetail);
+    element('render-status').textContent = graphics.mode === 'low' ? 'Battery saver' : graphics.lowDetail ? 'Auto · reduced detail' : 'Auto · standard';
+    scene.traverse(object => {
+      if (object instanceof THREE.Mesh) {
+        const materials = Array.isArray(object.material) ? object.material : [object.material];
+        materials.forEach(material => { material.needsUpdate = true; });
+      }
+    });
+  }
+  qualitySelect.addEventListener('change', () => {
+    graphics.setMode(parseGraphicsMode(qualitySelect.value));
+    applyGraphics();
+    try { localStorage.setItem(DISPLAY_KEY, graphics.mode); } catch { /* Preferences are optional; gameplay storage reports failures separately. */ }
+    qualitySelect.blur();
+  });
+  applyGraphics();
   renderer.setAnimationLoop((now: number) => {
     const realDt = last === undefined ? 0 : Math.max(0, (now - last) / 1000);
     const dt = Math.min(realDt, 0.1); last = now;
-    // Prefer responsive driving to high-resolution shadows on older phones/software GPUs.
-    slowFrames = realDt > 0.075 ? slowFrames + 1 : Math.max(0, slowFrames - 1);
-    if (!reducedQuality && slowFrames > 8) {
-      reducedQuality = true;
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 0.85));
-      renderer.shadowMap.enabled = false;
-      scene.traverse(object => {
-        if (object instanceof THREE.Mesh) {
-          const materials = Array.isArray(object.material) ? object.material : [object.material];
-          materials.forEach(material => { material.needsUpdate = true; });
-        }
-      });
-    }
+    if (graphics.observeFrame(realDt)) applyGraphics();
     elapsed += dt;
     if (started && !paused) {
       const steps = Math.max(1, Math.ceil(dt / (1 / 90)));
@@ -272,6 +287,9 @@ try {
     rickshaw.group.position.set(car.x, 0.08, car.z); rickshaw.group.rotation.y = car.heading;
     rickshaw.animate(paused ? 0 : car.speed, car.steering, elapsed);
     world.update(elapsed);
+    landscape.update(camera.position);
+    sun.position.set(car.x - 45, 70, car.z + 25);
+    sun.target.position.set(car.x, 0, car.z);
     pickupMarker.children[2].position.y = dropoffMarker.children[2].position.y = 5 + Math.sin(elapsed * 2) * 0.3;
     desiredCamera.set(car.x + Math.sin(car.heading) * (10 + Math.abs(car.speed) * 0.07), 6.4 + Math.abs(car.speed) * 0.04, car.z + Math.cos(car.heading) * (10 + Math.abs(car.speed) * 0.07));
     cameraRay.origin.set(car.x, 1.5, car.z);

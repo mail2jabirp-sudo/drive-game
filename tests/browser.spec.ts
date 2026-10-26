@@ -107,3 +107,73 @@ test('tea stop charges once, persists tea count, and preserves the active fare',
   expect(tea!.y + tea!.height).toBeLessThan(steering!.y);
   await page.screenshot({path:'test-results/tea-small-landscape.png'});
 });
+
+test('EN 3D preserves legacy saves, exposes honest map scope and bounds render cost', async ({ page }) => {
+  // Probe only the test response; the shipped game exposes no debug globals.
+  await page.route('**/src/main.ts*', async route => {
+    const response = await route.fetch();
+    const source = await response.text();
+    await route.fulfill({ response, body: source.replace('renderer.render(scene, camera);', `renderer.render(scene, camera);
+      window.__renderProbe = {
+        calls: renderer.info.render.calls, triangles: renderer.info.render.triangles,
+        shadows: renderer.shadowMap.enabled, chunks: landscape.chunkCount,
+        camera: camera.position.toArray(), car: [car.x, car.z], heading: car.heading,
+        roadClear: !world.colliders.some(b =>
+          [PICKUP, DROPOFF, SPAWN].some(p => blocked(p.x, p.z, [b])))
+      };`) });
+  });
+  await page.addInitScript(k => {
+    if (!localStorage.getItem(k)) localStorage.setItem(k, JSON.stringify({version:1,money:240,trips:2,phase:'dropoff',x:72,z:36,heading:0}));
+    if (!localStorage.getItem('en3d.display.v1')) localStorage.setItem('en3d.display.v1', 'low');
+  }, key);
+  const errors: string[] = [];
+  page.on('pageerror', error => errors.push(error.message));
+  await page.goto('/');
+  await expect(page).toHaveTitle(/EN 3D.*Kerala Open World Simulator/);
+  await expect(page.locator('.practice-notice')).toContainText('Fictional practice loop');
+  await page.screenshot({path:'test-results/en3d-welcome.png'});
+  await expect(page.locator('#start-button')).toBeEnabled();
+  await page.locator('#start-button').click();
+  await expect(page.locator('#money')).toHaveText('₹240');
+  await expect(page.locator('#mission-title')).toHaveText('Next stop: market');
+  await page.locator('#display-settings summary').click();
+  await expect(page.locator('#quality-select')).toHaveValue('low');
+  await expect(page.locator('#render-status')).toHaveText('Battery saver');
+  await expect.poll(async () => page.evaluate(() => (window as any).__renderProbe?.calls ?? 0)).toBeGreaterThan(20);
+  const probe = await page.evaluate(() => (window as any).__renderProbe);
+  expect(probe.shadows).toBe(false);
+  expect(probe.chunks).toBeGreaterThan(0);
+  expect(probe.calls).toBeLessThan(300);
+  expect(probe.triangles).toBeLessThan(200_000);
+  expect(probe.roadClear).toBe(true);
+  expect(probe.camera.every((n: number) => Number.isFinite(n))).toBe(true);
+  expect(probe.camera[1]).toBeGreaterThan(3);
+  console.log('EN 3D Battery saver rendering:', JSON.stringify(probe));
+  // Camera follows an actual short drive and the display control does not consume driving keys.
+  await page.locator('#display-settings summary').click();
+  await page.keyboard.down('KeyW');
+  await expect.poll(async () => Number(await page.locator('#speed').textContent())).toBeGreaterThan(10);
+  await page.keyboard.down('KeyA');
+  await expect.poll(async () => page.evaluate(() => (window as any).__renderProbe?.heading ?? 0)).toBeGreaterThan(0.02);
+  await page.keyboard.up('KeyA'); await page.keyboard.up('KeyW');
+  await page.keyboard.down('Space');
+  await expect(page.locator('#speed')).toHaveText('0');
+  await page.keyboard.up('Space');
+  await page.keyboard.press('KeyP');
+  const moved = await page.evaluate(k => JSON.parse(localStorage.getItem(k)!), key);
+  expect(moved.z).toBeLessThan(36);
+  expect(moved.heading).toBeGreaterThan(0);
+  expect(moved.money).toBe(240);
+  await page.screenshot({path:'test-results/en3d-game.png'});
+  await page.locator('#display-settings summary').click();
+  await page.locator('#quality-select').selectOption('auto');
+  expect(await page.evaluate(() => localStorage.getItem('en3d.display.v1'))).toBe('auto');
+  await page.locator('#quality-select').selectOption('low');
+  await page.setViewportSize({width:568,height:320});
+  await page.reload();
+  await expect(page.locator('#start-button')).toBeInViewport();
+  await expect(page.locator('.practice-notice')).toBeVisible();
+  await expect(page.locator('#quality-select')).toHaveValue('low');
+  await page.screenshot({path:'test-results/en3d-small-welcome.png'});
+  expect(errors).toEqual([]);
+});
