@@ -1,0 +1,14 @@
+© OpenStreetMap contributors
+https://www.openstreetmap.org/copyright
+
+kottakkal.json is a derived OpenStreetMap database distributed under ODbL 1.0.
+https://opendatacommons.org/licenses/odbl/1-0/
+
+Source: map.osm uploaded to mail2jabirp-sudo/drive-game in commit
+292f3b8b61b0003f9ae1db3f52b8baa0b139e5a5.
+Source SHA-256: d7ef65eeb57978269dcbb2404fe32120f93e42f795bbb0ef96c1bb08f49d4add
+
+Full source, adaptation script and provenance are distributed in the repository:
+https://github.com/mail2jabirp-sudo/drive-game/tree/codex/en3d-osm-kottakkal
+See DATA_LICENSES.md, map.osm, scripts/import_osm.py and data/OSM_PROVENANCE.json.
+Application code/original artwork have a separate MIT license.

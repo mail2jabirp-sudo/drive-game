@@ -1,0 +1,64 @@
+{
+  "source": {
+    "file": "map.osm",
+    "sha256": "d7ef65eeb57978269dcbb2404fe32120f93e42f795bbb0ef96c1bb08f49d4add",
+    "copyright": "© OpenStreetMap contributors",
+    "license": "https://opendatacommons.org/licenses/odbl/1-0/",
+    "upstreamCommit": "292f3b8b61b0003f9ae1db3f52b8baa0b139e5a5"
+  },
+  "sourceBytes": 12921889,
+  "sourceBounds": {
+    "minlat": "10.9833000",
+    "minlon": "75.9557000",
+    "maxlat": "11.0349000",
+    "maxlon": "76.0714000"
+  },
+  "originFeature": {
+    "type": "way",
+    "id": "378587276",
+    "method": "arithmetic mean of unique source vertices, excluding repeated ring closure"
+  },
+  "projection": {
+    "latitude": 11.001609,
+    "longitude": 76.00470916,
+    "earthRadius": 6371008.8
+  },
+  "bounds": {
+    "minX": -650,
+    "maxX": 650,
+    "minZ": -650,
+    "maxZ": 650
+  },
+  "formula": "x=R*cos(latitude0)*radians(longitude-longitude0); z=-R*radians(latitude-latitude0)",
+  "units": "metres",
+  "coordinatePrecisionMetres": 0.001,
+  "attributionUrl": "https://www.openstreetmap.org/copyright",
+  "limitations": [
+    "Approximate local equirectangular projection, not a surveyed 3D/elevation model.",
+    "Only retained motor-road segments and complete valid closed single-ring building/water footprints are rendered.",
+    "Widths and building heights are authored estimates where source tags are absent; widthSource/heightSource identify these.",
+    "Road topology uses shared original OSM node IDs, not inferred geometric intersections.",
+    "Multipolygon relations are omitted rather than filling holes incorrectly; relation/member diagnostics are counted.",
+    "Only explicit numeric maxspeed tags are exported; unknown limits stay null.",
+    "OSM tags reflect the uploaded snapshot and are not a statement of current traffic law."
+  ],
+  "stats": {
+    "bridges": 2,
+    "buildings": 203,
+    "excludedRestrictedRoads": 18,
+    "explicitSpeedRoadParts": 7,
+    "intersections": 70,
+    "landmarks": 107,
+    "missingWayNodeReferences": 0,
+    "oneWayRoadParts": 3,
+    "roadVertices": 641,
+    "roads": 68,
+    "skippedBuildingFootprints": 4470,
+    "skippedWaterAreas": 111,
+    "sourceNodes": 54513,
+    "sourceRelations": 173,
+    "sourceWays": 7188,
+    "unsupportedMultipolygons": 2,
+    "waterFeatures": 4
+  }
+}

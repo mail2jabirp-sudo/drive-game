@@ -9,7 +9,11 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview --host 0.0.0.0",
     "test": "tsx --test tests/*.test.ts",
-    "test:browser": "playwright test"
+    "test:browser": "playwright test",
+    "map:import": "python3 scripts/import_osm.py",
+    "map:check": "python3 scripts/check_map.py",
+    "prebuild": "npm run map:check",
+    "predev": "npm run map:check"
   },
   "dependencies": {
     "three": "^0.180.0"
