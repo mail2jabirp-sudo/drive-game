@@ -1,6 +1,6 @@
 # Third-party notices
 
-All artwork, signs, meshes and synthesized audio are created by this project. No third-party asset packs are used.
+Artwork, signs, vehicle models and synthesized audio are created by this project. No third-party asset packs are used. Geographic road/building/water geometry additionally derives from OpenStreetMap. Map data and its adapted database are ODbL 1.0, separately from MIT code/art; see DATA_LICENSES.md and public/maps/NOTICE.txt. © OpenStreetMap contributors: https://www.openstreetmap.org/copyright.
 
 The shipped game uses Three.js (MIT). Main tools are Vite (MIT), TypeScript (Apache-2.0), tsx (MIT), and Playwright (Apache-2.0). With user approval, the development dependency graph also retains BSD-3-Clause and ISC utilities. These tools are not shipped as game runtime libraries.
 

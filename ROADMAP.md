@@ -10,15 +10,17 @@ Continue `/workspace/drive-game`; retain the original practice loop, controls, c
 - Explicit Battery saver control plus automatic fallback. Existing missions, money, tea, controls and save key preserved.
 - TypeScript/production build, existing unit/browser regressions, save compatibility and rendering-budget checks.
 
-## Phase 2 — a small verified Kottakkal road-data slice (next)
+## Phase 2 — first Kottakkal slice delivered (current)
 
 Do not generate random roads as a substitute for available real geometry. Choose a small bounded section around Kottakkal and verify names/locations from the actual source before assigning landmarks. Keep the practice loop as a separate, explicit mode while real-road navigation and missions are developed.
 
-1. Fetch a bounded OpenStreetMap extract through a permitted public data endpoint, respecting its usage policy; cache a checked-in, reproducible extract rather than making every browser query a live service. Record source URL/query, bounding box, retrieval date, OSM object IDs/versions and a file checksum. Do not scrape map tiles or require paid APIs.
-2. Convert latitude/longitude to a documented local metre projection, preserve way-node order, curves, intersections and tags (`oneway`, `junction`, `maxspeed`, lanes and access). Separate roads from sidewalks/private access. Validate missing tags instead of guessing legal directions or limits. OSM elevation is often incomplete: do not claim surveyed heights.
-3. Partition meshes/data into bounded chunks; deterministic load/unload must not duplicate colliders or strand a moving vehicle. Test junction continuity, traversable route widths and restart behavior.
-4. Attribute **© OpenStreetMap contributors** visibly in the map UI, linked to https://www.openstreetmap.org/copyright. Record ODbL 1.0 terms and source provenance in a dedicated data notice; preserve notices and comply with share-alike obligations for distributed adapted databases. Code/assets retain their separate licenses. The user's request explicitly permits applicable map-data licensing; it is not an MIT-code license claim.
-5. Add one short playable road section only after data validation; migrate saves through explicit world/route identity without erasing wallet/passenger state. Confirm actual route/landmark references before calling it accurate. If access is blocked, report the endpoint/operation; do not substitute invented coordinates and call them real.
+The supplied `map.osm` from GitHub is now imported offline with `npm run map:import`. The input is unchanged. Source SHA, upstream commit, projection and diagnostics are recorded in `data/OSM_PROVENANCE.json`; visible contributor attribution and ODbL data licensing are in place. No live Overpass/map-service dependency is used.
+
+Current shipped area: ±650 m around source bus-stand way 378587276, containing 68 road parts, 203 source footprints, 107 POIs, 70 shared-node intersections, three ponds and one mapped stream. Width/height estimates are marked; one-way, explicit speed, bridge/layer tags and source identities are retained. Shared node IDs define directed connectivity; grade crossings do not magically connect. The fare uses a connected, returnable road route. Buildings are approximate models on real footprints, all with estimated heights in this slice.
+
+Rendering uses bounded 160 m batches and culling, not whole-Kerala streaming. Both the real-map mode and original practice loop remain available. Area positions/passengers are saved separately under the original storage key, with shared wallet/trips/tea counts written atomically. A changed map hash resets incompatible positions to the current safe start while preserving the saved passenger phase and wallet. No surveyed elevation, bridge height or real façade accuracy is claimed.
+
+Next validation: profile on actual mobile hardware; verify this source slice's entrances, widths and key POIs using permitted local references. For later source replacements/expansions, record their actual upstream commit, retain ODbL attribution/share-alike compliance, regenerate and review the data diff, test graph continuity/mission reachability and preserve both ride states. Keep bounded cached data instead of making every browser query a public API. Do not infer current legal limits or signals where tags are absent.
 
 ## Phase 3 — rules and fines
 

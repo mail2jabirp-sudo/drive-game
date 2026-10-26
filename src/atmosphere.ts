@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 
 /** A restrained humid morning sky; not a simulation of measured weather. */
-export function createAtmosphere(scene: THREE.Scene): void {
+export function createAtmosphere(scene: THREE.Scene): {update:(cameraPosition:THREE.Vector3)=>void} {
   const geometry = new THREE.SphereGeometry(480, 24, 12);
   const positions = geometry.getAttribute('position');
   const colors: number[] = [];
@@ -19,4 +19,6 @@ export function createAtmosphere(scene: THREE.Scene): void {
   const sun = new THREE.Mesh(new THREE.CircleGeometry(9, 32), new THREE.MeshBasicMaterial({ color: '#fff3d7', fog: false, depthWrite: false }));
   sun.position.set(-180, 280, 100); sun.lookAt(0, 0, 0); sun.renderOrder = -9;
   sun.name = 'Morning sun disc'; scene.add(sun);
+  const direction = sun.position.clone();
+  return {update(cameraPosition) {sky.position.copy(cameraPosition); sun.position.copy(cameraPosition).add(direction); sun.lookAt(cameraPosition);}};
 }

@@ -5,7 +5,7 @@ const seed = async (page: Page, value: object) => {
   await page.evaluate(p => { window.name = 'e2e:' + JSON.stringify(p); }, value);
 };
 const start = async (page: Page) => {
-  await page.goto('/');
+  await page.goto('/?world=practice');
   await expect(page.locator('#start-button')).toBeEnabled();
   await page.locator('#start-button').click();
   await expect(page.locator('#start-screen')).toBeHidden();

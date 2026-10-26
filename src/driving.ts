@@ -8,9 +8,13 @@ export function blocked(x: number, z: number, boxes: Box[]): boolean {
   const r = 1.05;
   return Math.abs(x) > 115 || Math.abs(z) > 105 || boxes.some(b => x + r > b.minX && x - r < b.maxX && z + r > b.minZ && z - r < b.maxZ);
 }
-export function advanceCar(car: DriveState, input: Controls, dt: number, boxes: Box[]): boolean {
+export interface DriveSurface {
+  roadSurface: (x: number, z: number) => boolean;
+  isBlocked: (x: number, z: number) => boolean;
+}
+export function advanceCar(car: DriveState, input: Controls, dt: number, boxes: Box[], surface?: DriveSurface): boolean {
   const oldSpeed = car.speed;
-  const offroad = !onRoad(car.x, car.z);
+  const offroad = !(surface?.roadSurface ?? onRoad)(car.x, car.z);
   if (input.throttle) car.speed += (car.speed < 0 ? 14 : 7) * dt;
   if (input.brake) car.speed -= (car.speed > 0 ? 16 : 4) * dt;
   if (!input.throttle && !input.brake) car.speed = approach(car.speed, 0, (offroad ? 4.5 : 1.6) * dt);
@@ -23,7 +27,7 @@ export function advanceCar(car: DriveState, input: Controls, dt: number, boxes: 
   car.heading += car.speed / 2.4 * Math.tan(steeringAtSpeed) * dt;
   const nx = car.x - Math.sin(car.heading) * car.speed * dt;
   const nz = car.z - Math.cos(car.heading) * car.speed * dt;
-  if (blocked(nx, nz, boxes)) {
+  if (surface ? surface.isBlocked(nx, nz) : blocked(nx, nz, boxes)) {
     car.speed = 0;
     return Math.abs(oldSpeed) > 3;
   }
