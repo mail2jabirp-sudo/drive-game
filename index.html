@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#173b31" />
+    <meta name="description" content="Take the scenic route. A free, stylized 3D auto-rickshaw driving game inspired by Kottakkal, Kerala." />
+    <title>Kottakkal Drive 3D — Take the scenic route</title>
+  </head>
+  <body>
+    <canvas id="game" tabindex="0" aria-label="3D driving game. Use WASD or arrow keys to drive your auto-rickshaw."></canvas>
+    <div class="screen-grain" aria-hidden="true"></div>
+
+    <header class="topbar">
+      <a class="brand" href="#" aria-label="Kottakkal Drive 3D">
+        <span class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 44 44" fill="none"><path d="M11 15h22l3 17H8l3-17Z" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round"/><path d="m14 8-3 7h22l-3-7H14Z" fill="currentColor"/><path d="m15 19-1 7h16l-1-7H15Z" fill="currentColor"/><circle cx="13" cy="34" r="3" fill="currentColor"/><circle cx="31" cy="34" r="3" fill="currentColor"/><path d="M11 29h4m14 0h4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        </span>
+        <span class="brand-name">KOTTAKKAL<span>DRIVE <b>3D</b></span></span>
+      </a>
+      <div class="topbar-right game-ui">
+        <div class="earnings" aria-label="Earnings and completed trips">
+          <span class="wallet-symbol" aria-hidden="true">₹</span>
+          <div><span class="eyebrow">YOUR EARNINGS</span><strong id="money">₹0</strong></div>
+          <span class="earnings-rule"></span>
+          <div class="trip-stat"><strong id="trips">0</strong><span class="eyebrow">TRIPS</span></div>
+        </div>
+        <div class="toolbar">
+          <button id="sound-button" class="icon-button" aria-label="Toggle sound" title="Toggle sound">♫</button>
+          <button id="pause-button" class="icon-button" aria-label="Pause game" title="Pause game" aria-pressed="false"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M5 3v10M11 3v10" stroke="currentColor" stroke-width="3"/></svg></button>
+          <button id="reset-button" class="icon-button reset-button" aria-label="Reset auto to the road" title="Reset auto to the road (R)">↺</button>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <section id="start-screen" class="start-screen" aria-label="Welcome to Kottakkal Drive">
+        <div class="welcome-copy">
+          <p class="welcome-eyebrow"><span></span> MALAPPURAM, KERALA · 11.00° N, 75.99° E</p>
+          <h1>A little ride.<br>A lot of <em>Kerala.</em></h1>
+          <p class="welcome-description">Your auto. Your town. Your own pace.<br>Wind through sunlit streets, pick up a passenger,<br class="desktop-break"> and make a little money along the way.</p>
+          <button id="start-button" class="start-button" disabled>Let's drive <span aria-hidden="true"><svg width="20" height="20" viewBox="0 0 20 20"><path d="M4 16 16 4M4 4h12v12" fill="none" stroke="currentColor" stroke-width="2"/></svg></span></button>
+          <p id="loading" class="loading">Warming up your auto…</p>
+          <p class="welcome-save"><span aria-hidden="true">◈</span> Free to roam. Progress saved on this device.</p>
+          <div class="welcome-controls" aria-label="Keyboard controls">
+            <span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> or arrow keys to drive</span>
+            <span><kbd>E</kbd> Pick up / drop off <i>·</i> <kbd>H</kbd> Horn</span>
+            <span><kbd>Space</kbd> Handbrake <i>·</i> <kbd>R</kbd> Reset auto</span>
+          </div>
+          <p class="touch-welcome">On a phone? Use the on-screen pedals and steering.</p>
+        </div>
+        <div class="welcome-stamp" aria-hidden="true"><span>GOD'S OWN</span><strong>slow lane</strong><span>TAKE THE SCENIC ROUTE</span></div>
+        <footer class="welcome-footer"><span>A SMALL TOWN. AN OPEN ROAD.</span><span>PROCEDURAL WORLD · NO ASSET DOWNLOADS · V1</span></footer>
+      </section>
+
+      <div class="game-ui">
+        <div class="location-pill"><span class="live-dot"></span><span id="location-label">Kottakkal town</span><span class="location-weather" aria-label="Sunny">☀</span></div>
+
+        <aside class="map-panel" aria-label="Town map">
+          <div class="map-heading"><span>YOUR NEIGHBOURHOOD</span><span class="north">N ↑</span></div>
+          <canvas id="minimap" width="256" height="240" aria-label="Map showing your auto and mission destination"></canvas>
+          <div class="map-legend"><span><i class="legend-auto"></i>YOU</span><span><i class="legend-stop"></i>NEXT STOP</span></div>
+        </aside>
+
+        <section class="mission-panel" aria-label="Current passenger mission">
+          <div class="mission-topline"><span class="eyebrow">A LITTLE LOCAL BUSINESS</span><span class="fare" id="mission-reward">+₹120</span></div>
+          <div class="mission-heading"><span class="mission-pin" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 20 20"><path d="M4 16 16 4M4 4h12v12" fill="none" stroke="currentColor" stroke-width="2"/></svg></span><h2 id="mission-title">Your first passenger</h2></div>
+          <p id="mission-description">Head to the auto stand. Someone needs a ride to the market.</p>
+          <div class="mission-bottom"><span class="distance"><span aria-hidden="true">◇</span> <strong id="mission-distance">48 m</strong><span class="distance-caption"> TO NEXT STOP</span></span><button id="interact-button" class="interact-button"><kbd>E</kbd><span>Interact</span></button></div>
+          <div class="mission-route" aria-hidden="true"><span class="route-dot active"></span><span>Bakery</span><span class="route-line"></span><span class="route-dot"></span><span>Town market</span></div>
+        </section>
+
+        <div class="speed-panel" aria-label="Speedometer"><span class="speed-label">EASY DOES IT</span><div><strong id="speed">0</strong><span>KM/H</span></div><span class="speed-road" aria-hidden="true">— — —</span></div>
+
+        <div class="desktop-controls" aria-label="Driving controls"><span><kbd>W</kbd> Throttle</span><span><kbd>S</kbd> Brake / reverse</span><span><kbd>A</kbd><kbd>D</kbd> Steer</span><span><kbd>Space</kbd> Handbrake</span><span><kbd>H</kbd> Horn</span></div>
+        <p id="save-status" class="save-status">◈ Saved on this device</p>
+
+        <div class="touch-controls" aria-label="Touch driving controls">
+          <div class="touch-steering"><button data-control="left" class="touch-button steering-button" aria-label="Steer left">←</button><button data-control="right" class="touch-button steering-button" aria-label="Steer right">→</button></div>
+          <div class="touch-auxiliary"><button data-control="horn" class="touch-button horn-button" aria-label="Sound horn">♪</button><button data-control="handbrake" class="touch-button handbrake-button" aria-label="Handbrake">P</button></div>
+          <div class="touch-pedals"><button data-control="brake" class="touch-button brake-button" aria-label="Brake or reverse"><span>↓</span><small>BRAKE / REV</small></button><button data-control="throttle" class="touch-button throttle-button" aria-label="Accelerate"><span>↑</span><small>GO</small></button></div>
+        </div>
+      </div>
+
+      <div id="toast" class="toast" role="status" aria-live="polite"></div>
+      <div id="fatal-error" class="fatal-error" role="alert" hidden></div>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
