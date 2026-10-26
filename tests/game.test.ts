@@ -42,3 +42,7 @@ test('save round-trip retains money, passenger and position; malformed saves rec
   const bad = parseProgress('{"version":1,"money":-50,"x":999,"z":"hello","heading":null,"phase":"hacked"}');
   assert.deepEqual(bad, newProgress());
 });
+test('existing V1 saves migrate tea counter without losing progress', () => {
+  const old = parseProgress('{"version":1,"money":120,"trips":1,"phase":"dropoff","x":72,"z":-12,"heading":0}');
+  assert.equal(old.money, 120); assert.equal(old.phase, 'dropoff'); assert.equal(old.teaBreaks, 0);
+});

@@ -37,7 +37,7 @@ Browser checks use Playwright and an installed Chromium at `/usr/bin/chromium`. 
 
 The auto starts on Bakery Road, pointing toward the first passenger. Follow the gold marker and map, stop within 8 metres, then press **E** or the mission button. Carry the passenger around the road loop to the teal marker at the market bus stand. Stop and interact again to earn **₹120**. Another fare then becomes available. There is no timer, penalty or traffic in V1, so take your time. You can roam the town off the roads at a lower speed.
 
-Earnings, completed trips, active passenger, position and heading save to this browser's local storage every two seconds, at interactions, on pause and on exit. Refreshing restores the ride. Private browsing or blocked storage can make saves temporary; the HUD reports storage failures. R resets only the vehicle, preserving your fare and money. Browser site-data clearing starts a fresh game. Saves stay on the device; there is no cloud account.
+Earnings, completed trips, tea-break count, active passenger, position and heading save to this browser's local storage every two seconds, at interactions, on pause and on exit. Refreshing restores the ride. Private browsing or blocked storage can make saves temporary; the HUD reports storage failures. R resets only the vehicle, preserving your fare and money. Browser site-data clearing starts a fresh game. Saves stay on the device; there is no cloud account.
 
 ## Project map
 
@@ -52,7 +52,7 @@ Earnings, completed trips, active passenger, position and heading save to this b
 
 ## Small next steps
 
-1. Tea-shop interaction at Chaya Kada (₹10, with saved tea-break count).
+1. **Done:** tea-shop interaction at Chaya Kada (₹10, with saved tea-break count).
 2. A few slow vehicles following the existing loop, then simple collision avoidance.
 3. A second passenger destination and a choice of fares.
 4. A short Manjeri road spur; expand toward Perinthalmanna after the loop is stable.
@@ -62,3 +62,7 @@ Implement and verify one small feature at a time. `PROGRESS.md` records checkpoi
 ## Licensing
 
 Original code and generated artwork are MIT licensed; see `LICENSE`. Runtime dependency Three.js is MIT. Primary tools are MIT/Apache-2.0; user-approved BSD-3-Clause and ISC transitive development utilities are also retained. See `THIRD_PARTY_NOTICES.md`; dependency lockfile pins the installed graph. No downloaded art, models, music, fonts or map data are included.
+
+### Tea stop
+
+Chaya Kada is on the west side of the loop (the small terracotta map dot). Park in the circle outside the shop. Press E, use the mission interaction button, or tap **Have chai · ₹10**. Tea costs ₹10 and adds one saved tea break. It is optional, has no timer or performance bonus, and preserves your passenger. Complete a fare first to afford a cup.

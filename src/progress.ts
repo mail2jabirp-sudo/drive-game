@@ -5,12 +5,13 @@ export interface Progress {
   version: 1;
   money: number;
   trips: number;
+  teaBreaks: number;
   phase: MissionPhase;
   x: number;
   z: number;
   heading: number;
 }
-export const newProgress = (): Progress => ({ version: 1, money: 0, trips: 0, phase: 'pickup', x: 72, z: 36, heading: 0 });
+export const newProgress = (): Progress => ({ version: 1, money: 0, trips: 0, teaBreaks: 0, phase: 'pickup', x: 72, z: 36, heading: 0 });
 
 /** Treat browser storage as untrusted input; a bad save must never break driving. */
 export function parseProgress(raw: string | null): Progress {
@@ -26,6 +27,7 @@ export function parseProgress(raw: string | null): Progress {
       version: 1,
       money: finite(p.money) ? Math.max(0, Math.min(9999999, Math.floor(p.money))) : 0,
       trips: finite(p.trips) ? Math.max(0, Math.min(999999, Math.floor(p.trips))) : 0,
+      teaBreaks: finite(p.teaBreaks) ? Math.max(0, Math.min(999999, Math.floor(p.teaBreaks))) : 0,
       phase: p.phase === 'dropoff' ? 'dropoff' : 'pickup',
       x: finite(p.x) && Math.abs(p.x) < 116 ? p.x : fresh.x,
       z: finite(p.z) && Math.abs(p.z) < 106 ? p.z : fresh.z,

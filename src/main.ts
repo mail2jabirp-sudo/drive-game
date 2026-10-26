@@ -6,6 +6,7 @@ import { advanceCar, blocked } from './driving';
 import type { DriveState } from './driving';
 import { Input } from './input';
 import { GameAudio } from './audio';
+import { buyTea, TEA_PRICE, TEA_STOP } from './tea';
 import { FARE, SAVE_KEY, newProgress, parseProgress, interactMission } from './progress';
 
 const element = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -94,8 +95,26 @@ try {
   const target = () => progress.phase === 'pickup' ? PICKUP : DROPOFF;
   const distance = () => Math.hypot(car.x - target().x, car.z - target().z);
 
+  const teaDistance = () => Math.hypot(car.x - TEA_STOP.x, car.z - TEA_STOP.z);
+  const teaRing = new THREE.Mesh(new THREE.RingGeometry(2.8, 3.0, 32), new THREE.MeshBasicMaterial({ color: '#c97645', side: THREE.DoubleSide }));
+  teaRing.rotation.x = -Math.PI / 2; teaRing.position.set(TEA_STOP.x, 0.13, TEA_STOP.z); scene.add(teaRing);
+  function interactTea(): void {
+    if (!started || paused || elapsed - lastInteraction < 1) return;
+    lastInteraction = elapsed;
+    const result = buyTea(progress, teaDistance(), car.speed);
+    if (result === 'bought') {
+      audio.success(); save();
+      toast(`A warm cup of chaya. −₹${TEA_PRICE} · ${progress.teaBreaks} tea break${progress.teaBreaks === 1 ? '' : 's'} enjoyed.`);
+    } else if (result === 'insufficient') toast('Chaya is ₹10. Complete a passenger fare, then stop by.');
+    else if (result === 'moving') toast('Park your auto before taking a tea break.');
+    else toast('Pull into the terracotta circle beside Chaya Kada.');
+    updateHud();
+  }
+  element('tea-button').addEventListener('click', interactTea);
+
   function interact(): void {
     if (!started || paused || elapsed - lastInteraction < 1) return;
+    if (teaDistance() <= 9 && distance() > 8) { interactTea(); return; }
     lastInteraction = elapsed;
     const result = interactMission(progress, distance(), car.speed);
     if (result === 'pickup') {
@@ -189,6 +208,7 @@ try {
     ctx.strokeRect(sx(-72), sz(-62), 144 * 0.91, 124 * 0.91); ctx.setLineDash([]);
     ctx.font = 'bold 10px sans-serif'; ctx.textAlign = 'center';
     ctx.fillStyle = '#75816a'; ctx.fillText('KOTTAKKAL', w / 2, h / 2 - 3); ctx.font = '9px sans-serif'; ctx.fillText('TOWN LOOP', w / 2, h / 2 + 11);
+    ctx.fillStyle = '#c97645'; ctx.beginPath(); ctx.arc(sx(TEA_STOP.x), sz(TEA_STOP.z), 4, 0, Math.PI * 2); ctx.fill();
     ctx.beginPath(); ctx.arc(sx(target().x), sz(target().z), 6, 0, Math.PI * 2);
     ctx.fillStyle = progress.phase === 'pickup' ? '#e9a52b' : '#198c7c'; ctx.fill();
     ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();
@@ -208,9 +228,14 @@ try {
     element('mission-reward').textContent = `₹${FARE} fare`;
     element('location-label').textContent = car.z < -40 ? 'Market Road' : car.x < -45 ? 'Chaya Corner' : car.z > 40 ? 'Palm Avenue' : 'Bakery Road';
     const nearby = distance() <= 8;
-    element('interact-button').querySelector('span')!.textContent = nearby ? Math.abs(car.speed) >= 2 ? 'Stop first' : pickingUp ? 'Pick up' : 'Drop off' : 'Interact';
-    element<HTMLButtonElement>('interact-button').disabled = !nearby || Math.abs(car.speed) >= 2 || paused;
-    element('interact-button').classList.toggle('ready', nearby && Math.abs(car.speed) < 2);
+    const nearTea = teaDistance() <= 9;
+    element('tea-panel').hidden = teaDistance() > 21;
+    element('tea-count').textContent = `${progress.teaBreaks} tea break${progress.teaBreaks === 1 ? '' : 's'} enjoyed`;
+    element<HTMLButtonElement>('tea-button').disabled = !nearTea || Math.abs(car.speed) >= 2 || paused;
+    teaRing.visible = teaDistance() < 35;
+    element('interact-button').querySelector('span')!.textContent = nearby ? Math.abs(car.speed) >= 2 ? 'Stop first' : pickingUp ? 'Pick up' : 'Drop off' : nearTea ? Math.abs(car.speed) >= 2 ? 'Stop first' : 'Have chai' : 'Interact';
+    element<HTMLButtonElement>('interact-button').disabled = (!nearby && !nearTea) || Math.abs(car.speed) >= 2 || paused;
+    element('interact-button').classList.toggle('ready', (nearby || nearTea) && Math.abs(car.speed) < 2);
     document.body.classList.toggle('has-passenger', !pickingUp);
     pickupMarker.visible = pickingUp; dropoffMarker.visible = !pickingUp; passenger.visible = !pickingUp;
     minimap();

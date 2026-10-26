@@ -83,3 +83,27 @@ test('mobile touch pedals and steering are usable without overflow', async ({ br
   await page.screenshot({path:'test-results/mobile-portrait.png'});
   await context.close();
 });
+test('tea stop charges once, persists tea count, and preserves the active fare', async ({ page }) => {
+  await page.addInitScript(k => {
+    if (window.name.startsWith('e2e:')) { localStorage.setItem(k, window.name.slice(4)); window.name = ''; }
+  }, key);
+  await page.goto('/');
+  await seed(page, {version:1,money:120,trips:1,teaBreaks:0,phase:'dropoff',x:-72,z:20,heading:0});
+  await start(page);
+  await expect(page.locator('#tea-panel')).toBeVisible();
+  await page.locator('#tea-button').click();
+  await expect(page.locator('#money')).toHaveText('₹110');
+  await expect(page.locator('#tea-count')).toHaveText('1 tea break enjoyed');
+  await expect(page.locator('#mission-title')).toHaveText('Next stop: market');
+  await start(page);
+  await expect(page.locator('#money')).toHaveText('₹110');
+  await expect(page.locator('#tea-count')).toHaveText('1 tea break enjoyed');
+  await page.screenshot({path:'test-results/tea-stop.png'});
+  await page.setViewportSize({width:568,height:320});
+  await expect(page.locator('#mission-title')).toBeHidden();
+  await expect(page.locator('#tea-button')).toBeVisible();
+  const tea = await page.locator('#tea-panel').boundingBox();
+  const steering = await page.locator('[data-control="left"]').boundingBox();
+  expect(tea!.y + tea!.height).toBeLessThan(steering!.y);
+  await page.screenshot({path:'test-results/tea-small-landscape.png'});
+});
