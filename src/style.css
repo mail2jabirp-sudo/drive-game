@@ -47,3 +47,5 @@ button:focus-visible,a:focus-visible,summary:focus-visible,select:focus-visible{
 .project-subtitle{display:block}
 .welcome-copy h1 [lang="ml"]{display:block;font-family:system-ui,sans-serif;font-size:.66em;letter-spacing:-.035em;line-height:1.45}
 .map-heading>span:first-child{min-width:0;max-width:calc(100% - 20px);letter-spacing:.15px;line-height:1.4}
+
+.display-popover{max-height:70vh;overflow:auto}.display-popover button{font:inherit;padding:6px;min-height:30px}.display-popover input{max-width:100%}#traffic-status{font-size:10px;line-height:1.4}

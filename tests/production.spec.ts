@@ -63,6 +63,7 @@ for (const mode of ['', '?world=osm', '?world=practice', '?world=malappuram'] as
     await expect(page.locator('#fatal-error')).toBeHidden();
     await expect(page.locator('#start-screen')).toBeHidden();
     await expect(page.locator('#mission-title')).toHaveText('Passenger fare');
+    await expect.poll(async()=>parseInt(await page.locator('#traffic-status').textContent()??'',10)).toBeGreaterThan(1);
     await expect(page.locator('.map-heading > span').first()).toHaveText('Kerala Open World Simulator');
     expect(await page.locator('body').innerText()).not.toMatch(/Malappuram\s+District/i);
     await expect(page.locator('#map-attribution')).toBeVisible();

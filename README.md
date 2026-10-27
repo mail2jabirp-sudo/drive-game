@@ -56,3 +56,7 @@ Default terrain is flat. Real DEM download remains proxy-blocked; no elevations 
 No district-wide buildings/landuse coverage, engineered bridge/tunnel elevations, AI traffic, working traffic lights/fines or pedestrian population is claimed. These are future increments requiring source verification and browser tests. Existing mapped one-way and speed tags are retained as data, not a guarantee of current traffic law. Building heights/materials, road widths without tags, shoulders and paint are visual estimates/artwork.
 
 © [OpenStreetMap contributors](https://www.openstreetmap.org/copyright). Derived geographic databases are **ODbL1.0**, separate from MIT application code. See [DATA_LICENSES.md](DATA_LICENSES.md). Application dependencies use MIT/Apache licensing; permissive BSD/ISC transitive build tools were approved by the user.
+
+## Nearby AI traffic
+
+A bounded traffic prototype now adds bikes, scooters, hatchbacks, autos, goods three-wheelers, vans, public buses and lorries on the existing roads. Use Display → Traffic density (Low/Medium/High), Audio volume or Clear nearby traffic. Battery Saver caps active traffic at6. Sounds are original synthesized substitutes. Existing auto controls, passenger fares and saves remain unchanged. See [TRAFFIC.md](TRAFFIC.md) for routing, mapped controls, performance and prototype limits.
