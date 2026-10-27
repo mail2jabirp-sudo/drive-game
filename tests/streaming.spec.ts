@@ -16,7 +16,7 @@ test('uploaded roads stream only nearby tiles, evict old geometry and support dr
   const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));
   const requested:string[]=[];page.on('request',r=>{if(/\/maps\/malappuram\/-?\d+_-?\d+\.json$/.test(r.url()))requested.push(r.url());});
   await instrument(page);await ready(page);
-  await expect(page.locator('#mission-title')).toHaveText('Malappuram District fare');
+  await expect(page.locator('#mission-title')).toHaveText('Passenger fare');
   const initial=await page.evaluate(()=>{const t=(window as any).__roadTest;return {keys:t.streamed.world.streaming.keys,camera:{x:t.camera.position.x,z:t.camera.position.z}};});
   // Origin bootstrap selects a connected mission; the chase camera may straddle the next cell.
   const allowed=new Set([...nearbyTileKeys(manifest,{x:0,z:0}),...nearbyTileKeys(manifest,initial.camera)]);

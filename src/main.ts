@@ -17,6 +17,8 @@ import { GameAudio } from './audio';
 import { buyTea, TEA_PRICE, TEA_STOP } from './tea';
 import { FARE, SAVE_KEY, newProgress, parseProgress, interactMission } from './progress';
 
+const BRAND_TITLE='EN 3D — എന്റെ നാട്';
+const SIMULATOR_SUBTITLE='Kerala Open World Simulator';
 const element = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 let progress = newProgress();
 let storageAvailable = true;
@@ -91,7 +93,7 @@ try {
   let mapData: OsmMap | null = null;
   let streamed: Awaited<ReturnType<typeof createStreamedRoadWorld>> | null = null;
   if (isExport) {
-    element('loading').textContent = 'Loading nearby Malappuram District roads…';
+    element('loading').textContent = 'Loading nearby roads…';
     streamed = await createStreamedRoadWorld(scene, exportRide ?? undefined, osmRide ?? undefined, previousWorld);
     mapData = streamed.data; mapId = mapData.source.sha256;
   } else if (isReal) {
@@ -123,10 +125,11 @@ try {
   }
   element('map-attribution').hidden = !isReal;
   if(streamed?.terrainSource)element('map-attribution').append(document.createTextNode(` · Terrain: ${streamed.terrainSource.attribution}`));
-  document.querySelector('.practice-notice')!.textContent = isExport ? 'Malappuram District · verified roads in a 36 km window · partial coverage, not the full district.' : isReal ? 'OSM roads and footprints · approximate buildings and heights · flat terrain.' : 'Fictional practice loop · real map available in the area selector.';
-  document.querySelector('.welcome-eyebrow')!.textContent = isExport ? 'MALAPPURAM DISTRICT · മലപ്പുറം ജില്ല' : isReal ? 'KOTTAKKAL · OPENSTREETMAP EXTRACT' : 'KOTTAKKAL INSPIRED · PRACTICE';
-  document.querySelector('.welcome-footer span:last-child')!.textContent = isExport ? (streamed?.terrainSource ? 'SOURCE ROADS · DEM TERRAIN PROTOTYPE' : 'VERIFIED SOURCE ROADS · FLAT TERRAIN') : isReal ? 'OSM GEOMETRY · APPROXIMATE BUILDING MODELS' : 'ORIGINAL FICTIONAL PRACTICE AREA';
-  document.querySelector('.map-heading > span')!.textContent = isExport ? 'MALAPPURAM DISTRICT' : isReal ? 'KOTTAKKAL · OSM' : 'FICTIONAL PRACTICE LOOP';
+  document.querySelector('.practice-notice')!.textContent = isExport ? 'Verified roads in a 36 km window · partial coverage, not the full district.' : isReal ? 'OSM roads and footprints · approximate buildings and heights · flat terrain.' : 'Fictional practice loop · real map available in the area selector.';
+  document.querySelector('.welcome-eyebrow')!.textContent = 'EN 3D';
+  document.querySelector('.welcome-footer span:first-child')!.textContent = BRAND_TITLE;
+  document.querySelector('.welcome-footer span:last-child')!.textContent = SIMULATOR_SUBTITLE;
+  document.querySelector('.map-heading > span')!.textContent = SIMULATOR_SUBTITLE;
   const rickshaw = createRickshaw();
   scene.add(rickshaw.group);
   if (surface.isBlocked(car.x, car.z)) {
@@ -311,7 +314,7 @@ try {
     element('trips').textContent = String(progress.trips);
     element('speed').textContent = String(Math.round(Math.abs(car.speed) * 3.6));
     const pickingUp = progress.phase === 'pickup';
-    element('mission-title').textContent = isExport ? pickingUp ? 'Malappuram District fare' : 'Passenger aboard' : isReal ? pickingUp ? 'Kottakkal road fare' : 'Passenger aboard' : pickingUp ? 'A ride to the market' : 'Next stop: market';
+    element('mission-title').textContent = isExport ? pickingUp ? 'Passenger fare' : 'Passenger aboard' : isReal ? pickingUp ? 'Kottakkal road fare' : 'Passenger aboard' : pickingUp ? 'A ride to the market' : 'Next stop: market';
     element('mission-description').textContent = realWorld ? pickingUp ? `Stop at ${realWorld.mission.pickupName}.` : `Follow the map route to ${realWorld.mission.dropoffName}.` : pickingUp ? 'A passenger is waiting outside the bakery. Pull into the gold circle.' : 'Passenger aboard. Follow the loop to the market bus stand and stop in the teal circle.';
     element('stream-status').hidden = !streamed;
     if(streamed) {const status=streamed.world.streaming;element('stream-status').textContent=status.error || `${status.resident}/${status.total} road tiles${status.loading ? ' · loading nearby…' : ' · nearby only'}`;}
@@ -321,7 +324,7 @@ try {
     if (mapData) {
       const nearest = nearestRoad(mapData.roads, {x:car.x,z:car.z});
       const nearbyPlace=streamed?.manifest.places?.filter(p=>Math.hypot(p.x-car.x,p.z-car.z)<1200).sort((a,b)=>Math.hypot(a.x-car.x,a.z-car.z)-Math.hypot(b.x-car.x,b.z-car.z))[0];
-      element('location-label').textContent = nearbyPlace ? `${nearbyPlace.name}${nearbyPlace.nameMl ? ` · ${nearbyPlace.nameMl}` : ''}` : nearest?.road.name || nearest?.road.highway || 'Malappuram District';
+      element('location-label').textContent = nearbyPlace ? `${nearbyPlace.name}${nearbyPlace.nameMl ? ` · ${nearbyPlace.nameMl}` : ''}` : nearest?.road.name || nearest?.road.highway || SIMULATOR_SUBTITLE;
       element('road-rules').textContent = nearest ? `${nearest.road.oneway !== 'no' ? 'One-way · ' : ''}${nearest.road.maxspeed === null ? 'limit unmapped' : `${nearest.road.maxspeed} km/h OSM`}` : 'Road data unavailable';
     }
     const nearby = distance() <= 8;
@@ -425,7 +428,7 @@ try {
     const fallback = document.createElement('a');
     const terrainRequested=isExport&&new URLSearchParams(location.search).get('terrain')==='1';
     if(terrainRequested) element('fatal-error').textContent='The terrain prototype requires a verified local DEM. Your saves are safe. ';
-    fallback.href = location.pathname; fallback.textContent = terrainRequested ? 'Open Malappuram District without terrain' : 'Retry Malappuram District';
+    fallback.href = location.pathname; fallback.textContent = terrainRequested ? 'Continue without terrain' : 'Retry loading';
     element('fatal-error').append(fallback);
   }
 }

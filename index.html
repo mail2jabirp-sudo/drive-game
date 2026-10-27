@@ -4,7 +4,10 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#173b31" />
-    <meta name="description" content="EN 3D — എന്റെ നാട്. One streamed Malappuram District driving world with verified OpenStreetMap roads and partial geographic coverage." />
+    <meta name="description" content="EN 3D — എന്റെ നാട്. Kerala Open World Simulator. Drive verified roads, carry passengers and save your progress. Current map coverage is partial." />
+    <meta name="application-name" content="EN 3D — എന്റെ നാട്" />
+    <meta property="og:title" content="EN 3D — എന്റെ നാട്" />
+    <meta property="og:description" content="Kerala Open World Simulator" />
     <title>EN 3D — എന്റെ നാട് · Kerala Open World Simulator</title>
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Crect width='48' height='48' rx='11' fill='%23293e32'/%3E%3Cpath d='M12 12h24v7H19v4h14v7H19v4h17v7H12z' fill='%23f3eee1'/%3E%3C/svg%3E" />
   </head>
@@ -45,10 +48,10 @@
     <main>
       <section id="start-screen" class="start-screen" aria-label="Welcome to EN 3D">
         <div class="welcome-copy">
-          <p class="welcome-eyebrow"><span></span> MALAPPURAM DISTRICT · മലപ്പുറം ജില്ല</p>
+          <p class="welcome-eyebrow"><span></span> EN 3D</p>
+          <h1>EN 3D — <span lang="ml">എന്റെ നാട്</span></h1>
           <p class="project-subtitle">Kerala Open World Simulator</p>
-          <h1>A little ride.<br>A lot of <em>Kerala.</em></h1>
-          <p class="welcome-description">Explore mapped Malappuram District roads.<br>Drive your auto, carry passengers and discover Kottakkal<br class="desktop-break"> within one continuous streamed world.</p>
+          <p class="welcome-description">Drive mapped roads, carry passengers<br>and explore at your own pace.</p>
           <p class="practice-notice">Verified roads in a 36 km window · partial district coverage.</p>
           <button id="start-button" class="start-button" disabled>Let's drive <span aria-hidden="true"><svg width="20" height="20" viewBox="0 0 20 20"><path d="M4 16 16 4M4 4h12v12" fill="none" stroke="currentColor" stroke-width="2"/></svg></span></button>
           <p id="loading" class="loading">Warming up your auto…</p>
@@ -61,11 +64,11 @@
           <p class="touch-welcome">On a phone? Use the on-screen pedals and steering.</p>
         </div>
         <div class="welcome-stamp" aria-hidden="true"><span>GOD'S OWN</span><strong>slow lane</strong><span>TAKE THE SCENIC ROUTE</span></div>
-        <footer class="welcome-footer"><span>EN 3D · KERALA OPEN WORLD SIMULATOR</span><span>MALAPPURAM DISTRICT · PARTIAL COVERAGE</span></footer>
+        <footer class="welcome-footer"><span>EN 3D — എന്റെ നാട്</span><span>Kerala Open World Simulator</span></footer>
       </section>
 
       <div class="game-ui">
-        <div class="location-pill"><span class="live-dot"></span><span id="location-label">Malappuram District</span><span class="location-weather" id="road-rules" aria-label="Road information">☀</span></div>
+        <div class="location-pill"><span class="live-dot"></span><span id="location-label">Kerala Open World Simulator</span><span class="location-weather" id="road-rules" aria-label="Road information">☀</span></div>
 
         <aside id="tea-panel" class="tea-panel" aria-label="Tea shop" hidden>
           <span class="eyebrow">A LITTLE ROADSIDE RITUAL</span>
@@ -76,7 +79,7 @@
         </aside>
 
         <aside class="map-panel" aria-label="Town map">
-          <div class="map-heading"><span>FICTIONAL PRACTICE LOOP</span><span class="north">N ↑</span></div>
+          <div class="map-heading"><span>Kerala Open World Simulator</span><span class="north">N ↑</span></div>
           <canvas id="minimap" width="256" height="240" aria-label="Map showing your auto and mission destination"></canvas>
           <p id="stream-status" class="map-attribution" hidden></p><p id="map-attribution" class="map-attribution" hidden>© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a> · <a href="https://opendatacommons.org/licenses/odbl/1-0/" target="_blank" rel="noopener">ODbL</a></p><div class="map-legend"><span><i class="legend-auto"></i>YOU</span><span><i class="legend-stop"></i>NEXT STOP</span></div>
         </aside>
