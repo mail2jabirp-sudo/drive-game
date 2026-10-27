@@ -274,7 +274,9 @@ export function createOsmWorld(scene: THREE.Scene, data: OsmMap, missionOverride
   }
   const signs: THREE.Mesh[] = [];
   const mappedSigns = data.landmarks.filter(l => ['bus_station', 'hospital', 'police', 'marketplace'].includes(l.kind)).sort((a,b)=>['bus_station','marketplace','police','hospital'].indexOf(a.kind)-['bus_station','marketplace','police','hospital'].indexOf(b.kind)).slice(0, 12);
-  for (const landmark of mappedSigns) {
+  // World-space name boards are disabled pending owner-provided designs.
+  // Verified POIs remain in the database and map/navigation UI.
+  for (const landmark of mappedSigns.slice(0,0)) {
     const canvas = document.createElement('canvas'); canvas.width = 640; canvas.height = 128;
     const ctx = canvas.getContext('2d')!;
     ctx.fillStyle = '#e9e7d6'; ctx.fillRect(0, 0, 640, 128); ctx.fillStyle = '#29483a'; ctx.textAlign = 'center';

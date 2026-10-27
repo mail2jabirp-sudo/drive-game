@@ -4,6 +4,7 @@ import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
 /** All geometry is made here; no external models, textures, or paid assets. */
 export function createRickshaw(): {
   group: THREE.Group;
+  setOccupied:(occupied:boolean)=>void;
   animate: (speed: number, steering: number, elapsed: number, braking?:boolean) => void;
 } {
   const group = new THREE.Group();
@@ -82,15 +83,16 @@ export function createRickshaw(): {
   box(group, [1.35, 0.52, 0.14], [0, 1.26, 1.15], seat);
   box(group, [0.64, 0.13, 0.47], [0, 0.96, -0.4], seat);
   box(group, [0.6, 0.49, 0.13], [0, 1.19, -0.18], seat);
+  const driver=new THREE.Group();driver.name="Seated player driver";group.add(driver);
   const shirt = new THREE.MeshStandardMaterial({ color: '#c5b38c', roughness: 1 });
   const skin = new THREE.MeshStandardMaterial({ color: '#9b6545', roughness: 1 });
   const hair = new THREE.MeshStandardMaterial({ color: '#1c2828', roughness: 1 });
-  sphere(group, [0, 1.33, -0.4], [0.23, 0.32, 0.16], shirt);
-  sphere(group, [0, 1.72, -0.43], [0.15, 0.18, 0.15], skin);
-  sphere(group, [0, 1.82, -0.41], [0.153, 0.09, 0.15], hair);
+  sphere(driver, [0, 1.33, -0.4], [0.23, 0.32, 0.16], shirt);
+  sphere(driver, [0, 1.72, -0.43], [0.15, 0.18, 0.15], skin);
+  sphere(driver, [0, 1.82, -0.41], [0.153, 0.09, 0.15], hair);
   for (const side of [-1, 1]) {
-    bar(group, [side * 0.2, 1.48, -0.42], [side * 0.28, 1.31, -0.85], 0.065, shirt);
-    sphere(group, [side * 0.28, 1.31, -0.85], [0.07, 0.07, 0.07], skin);
+    bar(driver, [side * 0.2, 1.48, -0.42], [side * 0.28, 1.31, -0.85], 0.065, shirt);
+    sphere(driver, [side * 0.28, 1.31, -0.85], [0.07, 0.07, 0.07], skin);
   }
   bar(group, [-0.35, 1.3, -0.86], [0.35, 1.3, -0.86], 0.035, charcoal);
   bar(group, [0, 1.3, -0.86], [0, 0.95, -1], 0.045, charcoal);
@@ -177,7 +179,7 @@ export function createRickshaw(): {
 
   // Batch only static direct children. Wheels, fork and canopy retain their
   // independent transforms, steering, suspension and rolling animation.
-  for(const parent of [group,cabin]){
+  for(const parent of [group,cabin,driver]){
     const batches=new Map<THREE.Material,THREE.Mesh[]>();
     for(const child of parent.children)if(child instanceof THREE.Mesh&&!Array.isArray(child.material)){const list=batches.get(child.material)??[];list.push(child);batches.set(child.material,list);}
     const oldGeometry=new Set<THREE.BufferGeometry>();
@@ -193,6 +195,7 @@ export function createRickshaw(): {
   let rotation = 0;
   return {
     group,
+    setOccupied(occupied){driver.visible=occupied;},
     animate(speed, steering, elapsed, braking=false) {
       tailLamp.emissiveIntensity=braking?2.2:.45;
       const dt = Math.max(0, Math.min(elapsed - lastElapsed, 0.1));

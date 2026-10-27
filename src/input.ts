@@ -10,6 +10,7 @@ export class Input {
       if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) e.preventDefault();
       this.keys.add(e.code);
       if (!e.repeat) {
+        if(e.code==='KeyF')action('vehicle');
         if (e.code === 'KeyE') action('interact');
         if (e.code === 'KeyH') action('horn');
         if (e.code === 'KeyC') action('camera');
@@ -44,6 +45,7 @@ export class Input {
     this.pointers.clear();
     document.querySelectorAll('.pressed').forEach(b => b.classList.remove('pressed'));
   }
+  get running():boolean{return this.keys.has('ShiftLeft')||this.keys.has('ShiftRight')||[...this.pointers.values()].includes('handbrake');}
   get controls(): Controls {
     const held = (name: string, ...codes: string[]) => [...this.pointers.values()].includes(name) || codes.some(c => this.keys.has(c));
     return {

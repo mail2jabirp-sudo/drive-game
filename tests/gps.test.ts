@@ -23,3 +23,5 @@ test('signal countdowns end at the actual shared AI/lamp phase transition for bo
   assert.notEqual(signalPhase(Math.floor(time)+seconds+1e-6,heading),phase);
  }
 });
+
+test('off-road guidance measures the actual source road-entry distance',()=>{const r={available:true,offRoad:true,distance:40,points:[{x:0,z:0},{x:40,z:0}]};const g=turnGuidance(r,{x:0,z:12});assert.equal(g.distance,12);assert.match(g.text,/ring/);});

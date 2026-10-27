@@ -1,3 +1,4 @@
+import type {FootSave} from './walking';
 import type { Progress, MissionPhase } from './progress';
 export const WORLD_KEY = 'en3d.world.v1';
 export interface PracticePose { x: number; z: number; heading: number; phase: MissionPhase }
@@ -14,8 +15,8 @@ export function readOsmRide(raw: string | null, field: 'osmRide' | 'exportRide' 
   } catch { return null; }
 }
 /** One atomic localStorage value keeps wallet changes and both ride states together. */
-export function serializeRouteProgress(progress: Progress, practicePose: PracticePose | null, osmRide: OsmRide | null, exportRide: OsmRide | null = null): string {
-  return JSON.stringify({ ...progress, ...(practicePose ?? {}), ...(osmRide ? { osmRide } : {}), ...(exportRide ? {exportRide} : {}) });
+export function serializeRouteProgress(progress: Progress, practicePose: PracticePose | null, osmRide: OsmRide | null, exportRide: OsmRide | null = null, onFoot:FootSave|null=null): string {
+  return JSON.stringify({ ...(onFoot?{onFoot}:{}), ...progress, ...(practicePose ?? {}), ...(osmRide ? { osmRide } : {}), ...(exportRide ? {exportRide} : {}) });
 }
 
 /** Reproject an archived Kottakkal ride; its original save field remains untouched. */

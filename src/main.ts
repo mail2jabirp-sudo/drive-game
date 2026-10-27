@@ -1,5 +1,9 @@
 import * as THREE from 'three';
 import './style.css';
+import {WalkingController,readFootSave} from './walking';
+import {createCharacter} from './character';
+import {TrafficObstacles} from './traffic-obstacles';
+import {rectanglesOverlap} from './traffic-sim';
 import { createWorld, PICKUP, DROPOFF, SPAWN } from './world';
 import { createLandscape } from './landscape';
 import { createAtmosphere } from './atmosphere';
@@ -36,6 +40,7 @@ let osmRide = readOsmRide(rawSave);
 let exportRide = readOsmRide(rawSave,'exportRide');
 let savedRideAvailable=false;
 try{const saved=JSON.parse(rawSave??'null');savedRideAvailable=saved?.version===1&&Number.isFinite(saved.money)&&Number.isFinite(saved.trips);}catch{/* Invalid saves do not enable Continue. */}
+let onFootSave=readFootSave(rawSave);
 let mapId: string | null = null;
 let missionOrigin: {x:number;z:number}|undefined;
 // Legacy URLs and area preferences all enter the same geographic district world.
@@ -66,7 +71,7 @@ function save(): void {
   else if (isReal && mapId) osmRide = {version:1, mapId, x:car.x, z:car.z, heading:car.heading, phase:progress.phase};
   else { progress.x = car.x; progress.z = car.z; progress.heading = car.heading; }
   try {
-    localStorage.setItem(SAVE_KEY, serializeRouteProgress(progress, isReal ? practicePose : null, osmRide, exportRide));
+    localStorage.setItem(SAVE_KEY, serializeRouteProgress(progress, isReal ? practicePose : null, osmRide, exportRide,onFootSave));
     storageAvailable = true;savedRideAvailable=true;
     if(mapId){element<HTMLButtonElement>('continue-button').disabled=false;element('continue-status').textContent=`₹${progress.money} · ${progress.trips} trips`;}
     element('save-status').textContent = 'Progress saved on this device';
@@ -147,6 +152,28 @@ try {
   else if(surface.isBlocked(car.x,car.z))Object.assign(car,spawn);
 
   const traffic=mapData&&realWorld?await createTraffic(scene,mapData,realWorld):null;
+  const footObstacles=new TrafficObstacles();
+  const footBlocked=(p:{x:number;z:number},ignoreVehicle=false)=>{
+    if(mapData)footObstacles.update(mapData.buildings);
+    return (realWorld?realWorld.isBlocked(p.x,p.z,.35):surface.isBlocked(p.x,p.z))||footObstacles.blocked({...p,heading:0},{width:.7,length:.7})||!!traffic?.blocksPedestrian(p.x,p.z)||!ignoreVehicle&&rectanglesOverlap({...p,heading:0,width:.7,length:.7},{...car,width:1.9,length:3.2},.12);
+  };
+  const drivingHints=document.querySelector('.desktop-controls')!.innerHTML;
+  const foot=new WalkingController(footBlocked),character=createCharacter();scene.add(character.group);
+  if(onFootSave?.mapId===mapId){
+    if(streamed)await streamed.world.refresh(onFootSave);
+    if(!foot.restore(onFootSave))onFootSave=null;
+  }else onFootSave=null;
+  const focus=()=>foot.active?foot.pose:car;
+  const syncFootSave=()=>{const p=foot.snapshot;onFootSave=p&&mapId?{version:1,mapId,...p}:null;};
+  function vehicleAction(){
+    if(!started||paused)return;
+    const result=foot.mode==='driving'?foot.exit(car):foot.enter(car);
+    if(result==='ok'){car.speed=0;input.clear();toast(foot.mode==='exiting'?'On foot · WASD / touch to walk · Shift / RUN to run.':'Entering your auto · your passenger and earnings are safe.');syncFootSave();save();}
+    else if(result==='moving')toast('ആദ്യം നിർത്തുക · Stop completely before leaving the vehicle.');
+    else if(result==='blocked')toast(foot.active?'Entry blocked · approach a clear side.':'Exit blocked · move to a clear, safe stopping place.');
+    else if(result==='far')toast('വാഹനത്തിലേക്ക് മടങ്ങുക · Walk within 3 m of your auto to enter.');
+  }
+  element('vehicle-action').addEventListener('click',()=>{vehicleAction();element('game').focus();});
   const trafficSelect=element<HTMLSelectElement>('traffic-density');trafficSelect.value=traffic?.sim.density??'medium';
   trafficSelect.addEventListener('change',()=>{traffic?.setDensity(readDensity(trafficSelect.value));});
   element('clear-traffic').addEventListener('click',()=>{traffic?.clear();toast('Nearby traffic cleared. Your ride and fare are safe.');});
@@ -205,37 +232,40 @@ try {
     }
   }
   let waitingPassengerRoads=mapData?.roads;
-  const target = () => progress.phase === 'pickup' ? pickup : dropoff;
+  const target = () => foot.active?car:progress.phase === 'pickup' ? pickup : dropoff;
   const navigator=new RoadNavigator(),gpsRenderer=createGpsRenderer(scene,groundHeight);
   let navRoute:NavigationRoute={points:[],distance:0,offRoad:false,available:false},navRevision=0;
+  let navOnFoot=foot.active;
   let navFrom={x:Infinity,z:Infinity},navTarget={x:Infinity,z:Infinity},nextNavigation=0;
   function updateNavigation(){
-    if(!mapData)return;
+    if(!mapData)return;const actor=focus();
     const changed=navigator.setRoads(mapData.roads),destination=target();
-    if(changed||destination.x!==navTarget.x||destination.z!==navTarget.z||elapsed>=nextNavigation&&Math.hypot(car.x-navFrom.x,car.z-navFrom.z)>6){
-      navRoute=navigator.route(car,destination);navRevision++;navFrom={x:car.x,z:car.z};navTarget={...destination};nextNavigation=elapsed+1;gpsRenderer.update(navRoute,car);
+    if(changed||navOnFoot!==foot.active||destination.x!==navTarget.x||destination.z!==navTarget.z||elapsed>=nextNavigation&&Math.hypot(actor.x-navFrom.x,actor.z-navFrom.z)>6){
+      navOnFoot=foot.active;navRoute=navigator.route(actor,destination);navRevision++;navFrom={x:actor.x,z:actor.z};navTarget={...destination};nextNavigation=elapsed+1;gpsRenderer.update(navRoute,actor,foot.active);
     }
-    const instruction=turnGuidance(navRoute,car);
+    const nearAuto=foot.active&&Math.hypot(actor.x-car.x,actor.z-car.z)<=3.2;
+    const instruction=nearAuto?{arrow:'↥',text:'Enter your parked auto',distance:Math.hypot(actor.x-car.x,actor.z-car.z)}:turnGuidance(navRoute,actor);
     const arrow=element('gps-arrow');if(arrow.dataset.direction!==instruction.arrow){arrow.innerHTML=navigationIcon(instruction.arrow);arrow.dataset.direction=instruction.arrow;}
     element('gps-instruction').textContent=instruction.text;
     const localTurn:Record<string,string>={'↰':'ഇടത്തോട്ട് തിരിയുക','↱':'വലത്തോട്ട് തിരിയുക','↶':'സുരക്ഷിതമായി തിരിയുക','↥':'റോഡിലേക്ക് മടങ്ങുക'};
-    element('gps-distance').textContent=navRoute.available?`${Math.round(instruction.distance)} m · ${progress.phase==='pickup'?'pickup':'drop-off'}${localTurn[instruction.arrow]?' · '+localTurn[instruction.arrow]:''}`:'Waiting for connected road coverage';
+    element('gps-distance').textContent=navRoute.available?`${Math.round(instruction.distance)} m · ${foot.active?'auto':progress.phase==='pickup'?'pickup':'drop-off'}${localTurn[instruction.arrow]?' · '+localTurn[instruction.arrow]:''}`:'Waiting for connected road coverage';
     const warning=element('road-warning'),signal=element('signal-status');warning.hidden=true;signal.hidden=true;
     if(!traffic)return;
-    const ahead=(p:{x:number;z:number},range:number)=>Math.hypot(p.x-car.x,p.z-car.z)<range&&-(p.x-car.x)*Math.sin(car.heading)-(p.z-car.z)*Math.cos(car.heading)>-4;
+    const ahead=(p:{x:number;z:number},range:number)=>Math.hypot(p.x-actor.x,p.z-actor.z)<range&&-(p.x-actor.x)*Math.sin(actor.heading)-(p.z-actor.z)*Math.cos(actor.heading)>-4;
     const match=nearestRoad(mapData.roads,car);
-    const control=[...traffic.sim.controls.values()].filter(c=>c.kind==='traffic_signals'&&traffic.sim.nodeEdges.has(c.nodeId)&&match?.road.nodeIds.includes(c.nodeId)&&ahead(c,90)).sort((a,b)=>Math.hypot(a.x-car.x,a.z-car.z)-Math.hypot(b.x-car.x,b.z-car.z))[0];
-    if(control){const phase=signalPhase(traffic.sim.clock,car.heading);signal.hidden=false;signal.dataset.phase=phase;signal.textContent=`Simulated signal · ${phase} · ${signalCountdown(traffic.sim.clock,car.heading)} s`;}
+    const control=[...traffic.sim.controls.values()].filter(c=>c.kind==='traffic_signals'&&traffic.sim.nodeEdges.has(c.nodeId)&&match?.road.nodeIds.includes(c.nodeId)&&ahead(c,90)).sort((a,b)=>Math.hypot(a.x-actor.x,a.z-actor.z)-Math.hypot(b.x-actor.x,b.z-actor.z))[0];
+    if(control){const phase=signalPhase(traffic.sim.clock,actor.heading);signal.hidden=false;signal.dataset.phase=phase;signal.textContent=`Simulated signal · ${phase} · ${signalCountdown(traffic.sim.clock,actor.heading)} s`;}
     if(match?.road.bridge&&match.distance<15){warning.hidden=false;warning.textContent='പാലം · Bridge — keep left';}
     else if([...traffic.sim.junctions].some(id=>{if(!match?.road.nodeIds.includes(id))return false;const e=traffic.sim.nodeEdges.get(id)!;return ahead(e.from===id?e.a:e.b,40);})){warning.hidden=false;warning.textContent='ജംഗ്ഷൻ · Junction — slow down';}
     else if(match?.road.points.some((b,i,list)=>{if(!i||i===list.length-1||!ahead(b,35))return false;const a=list[i-1],c=list[i+1],ux=b.x-a.x,uz=b.z-a.z,vx=c.x-b.x,vz=c.z-b.z;return Math.abs(Math.atan2(uz*vx-ux*vz,ux*vx+uz*vz))>.6;})){warning.hidden=false;warning.textContent='വളവ് · Bend — slow down';}
   }
-  const distance = () => Math.hypot(car.x - target().x, car.z - target().z);
+  const distance = () => Math.hypot(focus().x-target().x,focus().z-target().z);
 
   const teaDistance = () => tea ? Math.hypot(car.x - tea.x, car.z - tea.z) : Infinity;
   const teaRing = new THREE.Mesh(new THREE.RingGeometry(2.8, 3.0, 32), new THREE.MeshBasicMaterial({ color: '#c97645', side: THREE.DoubleSide }));
   teaRing.rotation.x = -Math.PI / 2; teaRing.position.set(tea?.x ?? 0, 0.13, tea?.z ?? 0); scene.add(teaRing);
   function interactTea(): void {
+    if(foot.active){toast('Return to your auto before using the tea stop.');return;}
     if (!started || paused || elapsed - lastInteraction < 1) return;
     lastInteraction = elapsed;
     const result = buyTea(progress, teaDistance(), car.speed);
@@ -250,6 +280,7 @@ try {
   element('tea-button').addEventListener('click', interactTea);
 
   function interact(): void {
+    if(foot.active){vehicleAction();return;}
     if (!started || paused || elapsed - lastInteraction < 1) return;
     if (teaDistance() <= 9 && distance() > 8) { interactTea(); return; }
     lastInteraction = elapsed;
@@ -263,12 +294,13 @@ try {
     updateHud();
   }
   function resetCar(): void {
+    if(foot.active){toast('Follow GPS back to your parked auto.');return;}
     car.x = spawn.x; car.z = spawn.z; car.heading = spawn.heading; car.speed = 0; car.steering = 0;
     snapCamera(); save(); toast('Back on the road. Your fare and earnings are safe.');
   }
   function pause(): void {
     if (!started) return;
-    paused = !paused; input.clear();
+    paused = !paused; input.clear();if(foot.active)foot.pose.speed=0;
     element('pause-button').innerHTML = paused
       ? '<svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="m4 2 10 6-10 6Z" fill="currentColor"/></svg>'
       : '<svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M5 3v10M11 3v10" stroke="currentColor" stroke-width="3"/></svg>';
@@ -282,17 +314,18 @@ try {
   input = new Input(name => {
     if(document.querySelector('dialog[open]'))return;
     if (name === 'pause') { pause(); return; }
-    if(name==='camera'){if(started&&!paused)switchCamera();return;}
+    if(name==='camera'){if(started&&!paused){if(foot.active)foot.viewHeading+=Math.PI/4;else switchCamera();}return;}
     if (!started || paused) return;
+    if(name==='vehicle'){vehicleAction();return;}
     if (name === 'interact') interact();
-    if (name === 'horn') audio.horn();
+    if (name === 'horn'&&!foot.active) audio.horn();
     if (name === 'reset') resetCar();
   });
   function beginDriving(){
     resumeAfterDialog=false;document.querySelectorAll<HTMLDialogElement>('dialog[open]').forEach(d=>d.close());
     started=true;paused=false;document.body.classList.remove('paused');document.body.classList.add('playing');
-    element('start-screen').hidden=true;element('pause-screen').hidden=true;input.clear();audio.start();snapCamera();
-    toast(!storageAvailable?'Storage unavailable · this ride cannot be saved.':progress.phase==='dropoff'?'Welcome back. Your passenger is still aboard.':'Stop at the gold ring and press E to pick up your passenger.');
+    element('start-screen').hidden=true;element('pause-screen').hidden=true;input.clear();audio.start();if(!foot.active)snapCamera();
+    toast(!storageAvailable?'Storage unavailable · this ride cannot be saved.':foot.active?'WASD to walk · Shift to run · F to enter your auto.':progress.phase==='dropoff'?'Welcome back. Your passenger is still aboard.':'Stop at the gold ring and press E to pick up your passenger.');
     save();element('game').focus();
   }
   element('start-button').addEventListener('click',beginDriving);
@@ -341,10 +374,10 @@ try {
   element('camera-button').setAttribute('aria-label',cameraMode==='chase'?'Switch to driver camera':'Switch to chase camera');
   function setCamera(mode:string){cameraMode=mode==='driver'?'driver':'chase';cameraSelect.value=cameraMode;
     element('camera-button').setAttribute('aria-label',cameraMode==='chase'?'Switch to driver camera':'Switch to chase camera');
-    try{localStorage.setItem('en3d.camera.v1',cameraMode);}catch{/* Optional preference. */}snapCamera();
+    try{localStorage.setItem('en3d.camera.v1',cameraMode);}catch{/* Optional preference. */}if(!foot.active)snapCamera();
   }
   function switchCamera(){setCamera(cameraMode==='chase'?'driver':'chase');}
-  cameraSelect.addEventListener('change',()=>setCamera(cameraSelect.value));element('camera-button').addEventListener('click',()=>{switchCamera();if(started&&!paused)element('game').focus();});
+  cameraSelect.addEventListener('change',()=>setCamera(cameraSelect.value));element('camera-button').addEventListener('click',()=>{if(foot.active)foot.viewHeading+=Math.PI/4;else switchCamera();if(started&&!paused)element('game').focus();});
   let cameraColliderSource = world.colliders;
   let cameraObstacles = cameraColliderSource.map(b => new THREE.Box3(new THREE.Vector3(b.minX, 0, b.minZ), new THREE.Vector3(b.maxX, 17, b.maxZ)));
   const cameraRay = new THREE.Ray();
@@ -356,13 +389,14 @@ try {
   function snapCamera(): void {
     camera.position.set(car.x+Math.sin(car.heading)*(cameraMode==='driver'?-.46:9),carHeight()+(cameraMode==='driver'?1.86:4.4),car.z+Math.cos(car.heading)*(cameraMode==='driver'?-.46:9));
     smoothedLook.set(car.x-Math.sin(car.heading)*8,carHeight()+1.4,car.z-Math.cos(car.heading)*8);
-    camera.lookAt(smoothedLook);camera.fov=cameraMode==='driver'?68:window.innerWidth<600?62:56;camera.updateProjectionMatrix();
+    camera.lookAt(smoothedLook);camera.fov=foot.active?58:cameraMode==='driver'?68:window.innerWidth<600?62:56;camera.updateProjectionMatrix();
   }
   snapCamera();
+  if(foot.active){camera.position.set(foot.pose.x+Math.sin(foot.viewHeading)*5.5,groundHeight(foot.pose.x,foot.pose.z)+3,foot.pose.z+Math.cos(foot.viewHeading)*5.5);smoothedLook.set(foot.pose.x,groundHeight(foot.pose.x,foot.pose.z)+1.1,foot.pose.z);camera.lookAt(smoothedLook);}
   const resize = () => {
     renderer.setSize(window.innerWidth, window.innerHeight);
     camera.aspect = window.innerWidth / window.innerHeight;
-    camera.fov = cameraMode==='driver'?68:window.innerWidth<600?62:56;
+    camera.fov = foot.active?58:cameraMode==='driver'?68:window.innerWidth<600?62:56;
     camera.updateProjectionMatrix();
   };
   window.addEventListener('resize', resize); resize();
@@ -375,11 +409,12 @@ try {
   const map = element<HTMLCanvasElement>('minimap');
   const ctx = map.getContext('2d')!;
   function minimap(): void {
+    const actor=focus();
     const w = map.width, h = map.height;
     const scale = mapData ? Math.min(w / (mapData.bounds.maxX-mapData.bounds.minX+45), h / (mapData.bounds.maxZ-mapData.bounds.minZ+45)) : 0.91;
     const viewScale = isExport ? 0.42 : scale;
-    const sx = (x: number) => w / 2 + (x - (isExport ? car.x : 0)) * viewScale;
-    const sz = (z: number) => h / 2 + (z - (isExport ? car.z : 0)) * viewScale;
+    const sx = (x: number) => w / 2 + (x - (isExport ? actor.x : 0)) * viewScale;
+    const sz = (z: number) => h / 2 + (z - (isExport ? actor.z : 0)) * viewScale;
     ctx.clearRect(0, 0, w, h);
     ctx.fillStyle = '#20392f'; ctx.fillRect(0, 0, w, h);
     ctx.fillStyle = '#365345';
@@ -402,12 +437,18 @@ try {
       ctx.font = 'bold 10px sans-serif'; ctx.textAlign = 'center'; ctx.fillStyle = '#75816a'; ctx.fillText('KOTTAKKAL',w/2,h/2-3);
       ctx.font = '9px sans-serif'; ctx.fillText('PRACTICE LOOP',w/2,h/2+11);
     }
+    if(mapData){
+      const kinds:Record<string,string>={hospital:'H',school:'S',college:'S',bus_station:'B',bus_stop:'B',taxi:'T',place_of_worship:'W',marketplace:'M',shop:'•'};
+      const pois=mapData.landmarks.filter(p=>kinds[p.kind]&&Math.hypot(p.x-actor.x,p.z-actor.z)<260).sort((a,b)=>Math.hypot(a.x-actor.x,a.z-actor.z)-Math.hypot(b.x-actor.x,b.z-actor.z)).slice(0,8);
+      for(const poi of pois){const x=sx(poi.x),z=sz(poi.z);if(x<9||x>w-10||z<12||z>h-12)continue;ctx.fillStyle='#b9ceb8';ctx.font='bold 9px sans-serif';ctx.fillText(kinds[poi.kind],x,z);}
+    }
     if (tea) {ctx.fillStyle = '#c97645'; ctx.beginPath(); ctx.arc(sx(tea.x),sz(tea.z),4,0,Math.PI*2);ctx.fill();}
     for(const [point,label,color] of [[pickup,'P','#c08433'],[dropoff,'D','#148e7c']] as const){const x=Math.max(10,Math.min(w-18,sx(point.x))),z=Math.max(16,Math.min(h-12,sz(point.z)));ctx.fillStyle=color;ctx.beginPath();ctx.arc(x,z,5,0,Math.PI*2);ctx.fill();ctx.font='bold 11px sans-serif';ctx.fillText(label,x+7,z-5);}
     ctx.beginPath(); ctx.arc(Math.max(10,Math.min(w-18,sx(target().x))), Math.max(16,Math.min(h-12,sz(target().z))), 6, 0, Math.PI * 2);
     ctx.fillStyle = progress.phase === 'pickup' ? '#e9a52b' : '#198c7c'; ctx.fill();
     ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();
-    ctx.save(); ctx.translate(sx(car.x), sz(car.z)); ctx.rotate(-car.heading);
+    if(foot.active){ctx.fillStyle='#d5c58b';const x=Math.max(10,Math.min(w-25,sx(car.x))),z=Math.max(15,Math.min(h-10,sz(car.z)));ctx.fillRect(x-4,z-4,8,8);ctx.font='bold 9px sans-serif';ctx.fillText('AUTO',x+6,z-5);}
+    ctx.save(); ctx.translate(sx(actor.x), sz(actor.z)); ctx.rotate(-actor.heading);
     ctx.beginPath(); ctx.moveTo(0, -7); ctx.lineTo(5, 6); ctx.lineTo(0, 3); ctx.lineTo(-5, 6); ctx.closePath();
     ctx.fillStyle = '#eef4de'; ctx.fill(); ctx.strokeStyle = '#142b22'; ctx.lineWidth = 1.5; ctx.stroke(); ctx.restore();
     ctx.fillStyle='#d0dfbd';ctx.font='9px sans-serif';
@@ -415,37 +456,48 @@ try {
     ctx.fillStyle = '#d0dfbd'; ctx.font = 'bold 10px sans-serif'; ctx.fillText('N ↑', w - 20, 20);
   }
   function updateHud(): void {
-    updateNavigation();
+    const actor=focus();updateNavigation();
     if(mapData&&mapData.roads!==waitingPassengerRoads&&Math.hypot(car.x-pickup.x,car.z-pickup.z)<250){placeWaitingPassenger();waitingPassengerRoads=mapData.roads;}
     element('traffic-status').textContent=traffic?.status??'Traffic unavailable';
     element('money').textContent = `₹${progress.money.toLocaleString('en-IN')}`;
     element('trips').textContent = String(progress.trips);
-    element('speed').textContent = String(Math.round(Math.abs(car.speed) * 3.6));
-    element('drive-gear').textContent=Math.abs(car.speed)<.15?'N':car.speed<0?'R':'D';
-    element('vehicle-status').textContent=Math.abs(car.speed)<.15?'Stationary':input.controls.handbrake?'Handbrake':input.controls.brake&&car.speed>0?'Braking':car.speed<0?'Reversing':'Driving';
+    element('speed').textContent = String(Math.round(Math.abs(actor.speed) * 3.6));
+    element('drive-gear').textContent=foot.active?'—':Math.abs(car.speed)<.15?'N':car.speed<0?'R':'D';
+    element('vehicle-status').textContent=foot.active?(foot.transition?'Changing mode':foot.pose.speed>2?'Running':foot.pose.speed>.1?'Walking':'On foot'):Math.abs(car.speed)<.15?'Stationary':input.controls.handbrake?'Handbrake':input.controls.brake&&car.speed>0?'Braking':car.speed<0?'Reversing':'Driving';
+    const modeChanged=document.body.classList.contains('on-foot')!==foot.active;document.body.classList.toggle('on-foot',foot.active);
+    if(modeChanged)document.querySelector('.desktop-controls')!.innerHTML=foot.active?'<span><kbd>WASD</kbd> Walk</span><span><kbd>Shift</kbd> Run</span><span><kbd>F</kbd> Enter auto</span><span><kbd>C</kbd> View</span>':drivingHints;
+    if(modeChanged){element('start-button').firstChild!.textContent=foot.active?'CONTINUE ON FOOT ':'START DRIVING ';element('drive-auto').firstChild!.textContent=foot.active?'CONTINUE ON FOOT ':'DRIVE THIS AUTO ';document.querySelector('.vehicle-badge')!.textContent=foot.active?'PARKED · YOUR AUTO':'READY TO DRIVE';}
+    element('vehicle-label').textContent=foot.active?'ON FOOT':'PASSENGER AUTO';
+    element('camera-button').setAttribute('aria-label',foot.active?'Rotate walking camera':cameraMode==='chase'?'Switch to driver camera':'Switch to chase camera');
+    const autoDistance=Math.hypot(foot.pose.x-car.x,foot.pose.z-car.z);
+    element('vehicle-action').textContent=foot.transition?'Please wait…':foot.active?`Enter auto · ${Math.round(autoDistance)} m`:'Exit auto · F';
+    element<HTMLButtonElement>('vehicle-action').disabled=foot.transition||paused||(foot.active?autoDistance>3.2:Math.abs(car.speed)>.2);
+    const runButton=document.querySelector<HTMLButtonElement>('[data-control=handbrake]')!;runButton.textContent=foot.active?'RUN':'P';runButton.setAttribute('aria-label',foot.active?'Run while held':'Handbrake');
+    document.querySelector<HTMLButtonElement>('[data-control=horn]')!.disabled=foot.active;
+    element('touch-throttle-label').textContent=foot.active?'WALK':'GO';element('touch-brake-label').textContent=foot.active?'BACK':'BRAKE / REV';
     const pickingUp = progress.phase === 'pickup';
-    element('mission-title').textContent = isExport ? pickingUp ? 'Passenger fare' : 'Passenger aboard' : isReal ? pickingUp ? 'Kottakkal road fare' : 'Passenger aboard' : pickingUp ? 'A ride to the market' : 'Next stop: market';
-    element('mission-description').textContent = realWorld ? pickingUp ? `Stop at ${realWorld.mission.pickupName}.` : `Follow the map route to ${realWorld.mission.dropoffName}.` : pickingUp ? 'A passenger is waiting outside the bakery. Pull into the gold circle.' : 'Passenger aboard. Follow the loop to the market bus stand and stop in the teal circle.';
+    element('mission-title').textContent = foot.active?'Return to your auto': isExport ? pickingUp ? 'Passenger fare' : 'Passenger aboard' : isReal ? pickingUp ? 'Kottakkal road fare' : 'Passenger aboard' : pickingUp ? 'A ride to the market' : 'Next stop: market';
+    element('mission-description').textContent =foot.active?'F to enter · WASD to walk · Shift / RUN button to run': realWorld ? pickingUp ? `Stop at ${realWorld.mission.pickupName}.` : `Follow the map route to ${realWorld.mission.dropoffName}.` : pickingUp ? 'A passenger is waiting outside the bakery. Pull into the gold circle.' : 'Passenger aboard. Follow the loop to the market bus stand and stop in the teal circle.';
     element('stream-status').hidden = !streamed;
     if(streamed) {const status=streamed.world.streaming;element('stream-status').textContent=status.error || `${status.resident}/${status.total} road tiles${status.loading ? ' · loading nearby…' : ' · nearby only'}`;}
     element('mission-distance').textContent = `${Math.round(distance())} m away`;
-    element('mission-reward').textContent = `₹${FARE} fare`;
+    element('mission-reward').textContent = foot.active?'OWN AUTO':`₹${FARE} fare`;
     element('location-label').textContent = car.z < -40 ? 'Market Road' : car.x < -45 ? 'Chaya Corner' : car.z > 40 ? 'Palm Avenue' : 'Bakery Road';
     if (mapData) {
-      const nearest = nearestRoad(mapData.roads, {x:car.x,z:car.z});
-      const nearbyPlace=streamed?.manifest.places?.filter(p=>Math.hypot(p.x-car.x,p.z-car.z)<1200).sort((a,b)=>Math.hypot(a.x-car.x,a.z-car.z)-Math.hypot(b.x-car.x,b.z-car.z))[0];
+      const nearest = nearestRoad(mapData.roads,actor);
+      const nearbyPlace=streamed?.manifest.places?.filter(p=>Math.hypot(p.x-actor.x,p.z-actor.z)<1200).sort((a,b)=>Math.hypot(a.x-actor.x,a.z-actor.z)-Math.hypot(b.x-actor.x,b.z-actor.z))[0];
       element('location-label').textContent = nearbyPlace ? `${nearbyPlace.name}${nearbyPlace.nameMl ? ` · ${nearbyPlace.nameMl}` : ''}` : nearest?.road.name || nearest?.road.highway || SIMULATOR_SUBTITLE;
       element('road-rules').textContent = nearest ? `${nearest.road.oneway !== 'no' ? 'One-way · ' : ''}${nearest.road.maxspeed === null ? 'limit unmapped' : `${nearest.road.maxspeed} km/h OSM`}` : 'Road data unavailable';
     }
     element('menu-location').textContent=element('location-label').textContent;
     const nearby = distance() <= 8;
     const nearTea = teaDistance() <= 9;
-    element('tea-panel').hidden = teaDistance() > 21;
+    element('tea-panel').hidden = foot.active||teaDistance() > 21;
     element('tea-count').textContent = `${progress.teaBreaks} tea break${progress.teaBreaks === 1 ? '' : 's'} enjoyed`;
-    element<HTMLButtonElement>('tea-button').disabled = !nearTea || Math.abs(car.speed) >= 2 || paused;
+    element<HTMLButtonElement>('tea-button').disabled = foot.active||!nearTea || Math.abs(car.speed) >= 2 || paused;
     teaRing.visible = teaDistance() < 35;
-    element('interact-button').querySelector('span')!.textContent = nearby ? Math.abs(car.speed) >= 2 ? 'Stop first' : pickingUp ? 'Pick up' : 'Drop off' : nearTea ? Math.abs(car.speed) >= 2 ? 'Stop first' : 'Have chai' : 'Interact';
-    element<HTMLButtonElement>('interact-button').disabled = (!nearby && !nearTea) || Math.abs(car.speed) >= 2 || paused;
+    element('interact-button').querySelector('span')!.textContent =foot.active?'Enter auto': nearby ? Math.abs(car.speed) >= 2 ? 'Stop first' : pickingUp ? 'Pick up' : 'Drop off' : nearTea ? Math.abs(car.speed) >= 2 ? 'Stop first' : 'Have chai' : 'Interact';
+    element<HTMLButtonElement>('interact-button').disabled = foot.active?(autoDistance>3.2||foot.transition||paused):(!nearby && !nearTea) || Math.abs(car.speed) >= 2 || paused;
     element('interact-button').classList.toggle('ready', (nearby || nearTea) && Math.abs(car.speed) < 2);
     document.body.classList.toggle('has-passenger', !pickingUp);
     pickupMarker.visible = started&&pickingUp; dropoffMarker.visible = started&&!pickingUp; passenger.visible = !pickingUp; waitingPassenger.visible = pickingUp&&waitingPassengerValid;
@@ -483,17 +535,24 @@ try {
     const dt = Math.min(realDt, 0.1); last = now;
     if (graphics.observeFrame(realDt)) applyGraphics();
     elapsed += dt;
-    traffic?.update(dt,car,graphics.lowDetail,!paused);
+    traffic?.setParkedVehicle(foot.active?car:null);
+    traffic?.update(dt,focus(),graphics.lowDetail,!paused);
     if (started && !paused) {
+      const previousMode=foot.mode;const controls=input.controls;
+      foot.update(dt,{forward:controls.throttle,back:controls.brake,left:controls.left,right:controls.right,run:input.running});
+      if(previousMode!==foot.mode){input.clear();syncFootSave();save();}
       const steps = Math.max(1, Math.ceil(dt / (1 / 90)));
-      for (let n = 0; n < steps; n++) {
+      for (let n = 0; n < steps&&!foot.active; n++) {
         const oldX=car.x,oldZ=car.z;
         const hit = advanceCar(car, input.controls, dt / steps, world.colliders, realWorld ?? undefined);
         if(traffic?.blocksPlayer(car.x,car.z,car.heading)){car.x=oldX;car.z=oldZ;car.speed=0;if(elapsed-lastToast>3){toast('Traffic ahead · wait for a clear gap or use Display to clear nearby traffic.');lastToast=elapsed;}}
         if (hit && elapsed - lastToast > 3) { toast('Easy there! Use R to get back on the road.'); lastToast = elapsed; }
       }
-      if (elapsed - lastSave > 2) { save(); lastSave = elapsed; }
+      if (elapsed - lastSave > 2) { syncFootSave();save(); lastSave = elapsed; }
     }
+    const actor=focus();syncFootSave();
+    rickshaw.setOccupied(!foot.active);character.group.visible=foot.active;
+    character.group.position.set(foot.pose.x,groundHeight(foot.pose.x,foot.pose.z),foot.pose.z);character.group.rotation.y=foot.pose.heading;character.update(paused?0:dt,foot.transition?1.4:foot.pose.speed);
     rickshaw.group.position.set(car.x, carHeight()+0.08, car.z);
     rickshaw.group.rotation.order='YXZ';rickshaw.group.rotation.y=car.heading;
     const dx=-Math.sin(car.heading),dz=-Math.cos(car.heading);
@@ -502,11 +561,11 @@ try {
     const roll=Math.atan2(groundHeight(car.x+rx,car.z+rz)-groundHeight(car.x-rx,car.z-rz),2);
     rickshaw.group.rotation.x+=(pitch-rickshaw.group.rotation.x)*(1-Math.exp(-dt*8));
     rickshaw.group.rotation.z+=(roll-rickshaw.group.rotation.z)*(1-Math.exp(-dt*8));
-    rickshaw.animate(paused ? 0 : car.speed, car.steering, elapsed,input.controls.brake||input.controls.handbrake);
+    rickshaw.animate(paused ? 0 : car.speed, car.steering, elapsed,!foot.active&&(input.controls.brake||input.controls.handbrake));
     if (realWorld) realWorld.update(elapsed, camera.position, graphics.lowDetail); else world.update(elapsed, camera.position);
     landscape.update(camera.position);
-    sun.position.set(car.x - 45, carHeight()+70, car.z + 25);
-    sun.target.position.set(car.x, carHeight(), car.z);
+    sun.position.set(actor.x-45,groundHeight(actor.x,actor.z)+70,actor.z+25);
+    sun.target.position.set(actor.x,groundHeight(actor.x,actor.z),actor.z);
     // Keep the nearby road view clear; the ground ring and passenger still mark the stop.
     pickupMarker.children[2].visible=Math.hypot(car.x-pickup.x,car.z-pickup.z)>12;
     dropoffMarker.children[2].visible=Math.hypot(car.x-dropoff.x,car.z-dropoff.z)>12;
@@ -525,17 +584,32 @@ try {
       desiredCamera.set(car.x-Math.sin(car.heading)*.46,carHeight()+1.86,car.z-Math.cos(car.heading)*.46);
       lookAt.set(car.x-Math.sin(car.heading)*20,carHeight()+1.55,car.z-Math.cos(car.heading)*20);
     }
+    if(foot.active){
+      const origin=new THREE.Vector3(actor.x,groundHeight(actor.x,actor.z)+1.3,actor.z);
+      const inverse=new THREE.Matrix4().makeRotationY(car.heading).setPosition(car.x,carHeight(),car.z).invert();
+      const parkedBox=new THREE.Box3(new THREE.Vector3(-1.05,0,-1.65),new THREE.Vector3(1.05,2.45,1.65));
+      const clearView=(yaw:number)=>{
+        const desired=new THREE.Vector3(actor.x+Math.sin(yaw)*5.5,groundHeight(actor.x,actor.z)+3,actor.z+Math.cos(yaw)*5.5);
+        const ray=new THREE.Ray(origin,desired.clone().sub(origin).normalize());let distance=origin.distanceTo(desired);
+        for(const box of cameraObstacles)if(ray.intersectBox(box,cameraHit))distance=Math.min(distance,Math.max(.8,origin.distanceTo(cameraHit)-.4));
+        if(foot.mode==='walking'){const local=ray.clone().applyMatrix4(inverse),hit=local.intersectBox(parkedBox,new THREE.Vector3());if(hit)distance=Math.min(distance,Math.max(.8,local.origin.distanceTo(hit)-.35));}
+        return {distance,position:origin.clone().addScaledVector(ray.direction,distance)};
+      };
+      let view=clearView(foot.viewHeading);
+      if(view.distance<3.5&&foot.mode==='walking')for(const turn of [Math.PI/4,-Math.PI/4,Math.PI/2,-Math.PI/2,Math.PI]){const candidate=clearView(foot.viewHeading+turn);if(candidate.distance>4){foot.viewHeading+=turn;view=candidate;break;}}
+      desiredCamera.copy(view.position);lookAt.set(actor.x,groundHeight(actor.x,actor.z)+1.1,actor.z);
+    }
     if(!started){
       const orbit=matchMedia('(prefers-reduced-motion: reduce)').matches?0:Math.sin(elapsed*.08)*.12;
-      const angle=car.heading+orbit;
-      desiredCamera.set(car.x+Math.sin(angle)*8+Math.cos(angle)*7,carHeight()+3.6,car.z+Math.cos(angle)*8-Math.sin(angle)*7);
-      lookAt.set(car.x-Math.cos(car.heading)*3-Math.sin(car.heading)*2,carHeight()+1.3,car.z+Math.sin(car.heading)*3-Math.cos(car.heading)*2);
+      const angle=actor.heading+orbit;
+      desiredCamera.set(actor.x+Math.sin(angle)*8+Math.cos(angle)*7,groundHeight(actor.x,actor.z)+3.6,actor.z+Math.cos(angle)*8-Math.sin(angle)*7);
+      lookAt.set(actor.x-Math.cos(actor.heading)*3-Math.sin(actor.heading)*2,groundHeight(actor.x,actor.z)+1.3,actor.z+Math.sin(actor.heading)*3-Math.cos(actor.heading)*2);
     }
-    const targetFov=started?(cameraMode==='driver'?68:(window.innerWidth<600?62:56)+Math.min(4,Math.abs(car.speed)*.2)):50;
+    const targetFov=started?(foot.active?58:cameraMode==='driver'?68:(window.innerWidth<600?62:56)+Math.min(4,Math.abs(car.speed)*.2)):50;
     if(Math.abs(camera.fov-targetFov)>.02){camera.fov+=(targetFov-camera.fov)*(1-Math.exp(-dt*4));camera.updateProjectionMatrix();}
     camera.position.lerp(desiredCamera, 1 - Math.exp(-dt * 5));
     smoothedLook.lerp(lookAt, 1 - Math.exp(-dt * 8)); camera.lookAt(smoothedLook);
-    audio.update(car.speed, started && !paused);
+    audio.update(car.speed, started && !paused&&!foot.active);
     audio.updateTraffic(traffic?.sim.agents??[],camera.position,camera.getWorldDirection(audioForward),started&&!paused,dt);
     hudClock += dt;
     if (hudClock > 0.1) { updateHud(); hudClock = 0; }
