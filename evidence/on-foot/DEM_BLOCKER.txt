@@ -1,0 +1,4 @@
+Requested source: https://elevation-tiles-prod.s3.amazonaws.com/skadi/N11/N11E076.hgt.gz
+Method: HTTPS HEAD using Python urllib, normal certificate validation, 15-second timeout.
+Observed result: <urlopen error Tunnel connection failed: 403 Forbidden>
+No DEM bytes downloaded or geographic terrain generated. This is a tunnel/proxy rejection, not a validated response from the upstream dataset.
