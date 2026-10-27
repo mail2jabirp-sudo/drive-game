@@ -4,14 +4,14 @@ The game is a static Vite application. Netlify serves the compiled `dist` direct
 
 ## Source branch and history
 
-The complete game and deployment files are on **`codex/en3d-osm-kottakkal`** in `mail2jabirp-sudo/drive-game`. The original game commits and uploaded `map.osm` history are both preserved. **`main` currently contains only the original map upload.** Deploy the complete game branch, or review and merge that branch into `main` before choosing `main` in Netlify. Do not force-push or replace history to make deployment work.
+The complete game and deployment files are now on **`main`**, advanced normally from the original map-only commit. The original game commits and uploaded map history are preserved. The earlier `codex/en3d-osm-kottakkal` branch remains available; no force-push or history replacement was used.
 
 ## Netlify settings
 
 | Setting | Value |
 | --- | --- |
 | Repository | `mail2jabirp-sudo/drive-game` |
-| Production branch | `codex/en3d-osm-kottakkal` (or `main` after merge) |
+| Production branch | `main` |
 | Base directory | Repository root; leave blank |
 | Build command | `npm run build` |
 | Publish directory | `dist` |
@@ -55,7 +55,7 @@ This is local validation, not proof of a completed Netlify build or published si
 
 ## Remaining deployment steps
 
-1. In Netlify, import the GitHub repository and authorize access using Netlify's own account flow. Select the complete game branch, or merge it into `main` first.
+1. In Netlify, import the GitHub repository and authorize access using Netlify's own account flow. Select `main` and confirm the deployment uses its current game commit, not the historical map-only commit.
 2. Check the root/build/publish settings above and use a current build image. Do not supply API keys: the current game does not need any.
 3. Trigger the deployment and check the actual Netlify build log for dependency installation, Python map freshness check, TypeScript and Vite success. A first Netlify build has not been run from this workspace.
 4. Open the resulting HTTPS site. Check the default welcome/start, both world choices, driving/mission UI, reload, touch controls and visible attribution. `/maps/kottakkal.json`, `/maps/NOTICE.txt` and the HTML's `/assets/` URLs must return their actual files without 404s or HTML substitutions.
