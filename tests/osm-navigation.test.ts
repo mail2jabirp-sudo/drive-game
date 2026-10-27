@@ -100,3 +100,11 @@ test('optional terrain places road pavement, junction discs and ground in the sa
   assert.ok(ground&&roadVertices>100);assert.equal(world.heightAt(100,0),10);
   assert.ok(world.roadSurface(150,50));assert.ok(!world.isBlocked(150,50));world.dispose();
 });
+
+test('large unified worlds retain a nearby bounded ground patch at distant road coordinates',()=>{
+ const fixture:OsmMap={...source,bounds:{minX:-18000,maxX:18000,minZ:-18000,maxZ:18000},roads:[road('far',['a','b','c'],[{x:-9000,z:6000},{x:-8800,z:6000},{x:-8600,z:6000}])],buildings:[],landmarks:[],water:[],intersections:[]};
+ const {scene,world}=createFixture(fixture);world.update(0,new THREE.Vector3(-9000,6.4,6000),true);
+ const ground=scene.getObjectByName('Flat map ground') as THREE.Mesh;const bounds=new THREE.Box3().setFromObject(ground);
+ assert.ok(bounds.max.x-bounds.min.x<=2400);assert.ok(bounds.max.z-bounds.min.z<=2400);
+ assert.ok(bounds.containsPoint(new THREE.Vector3(-9000,-0.025,6000)));assert.ok(world.roadSurface(-8900,6000));world.dispose();
+});

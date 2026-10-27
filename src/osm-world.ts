@@ -34,14 +34,17 @@ export function createOsmWorld(scene: THREE.Scene, data: OsmMap, missionOverride
   const roadPaint = new THREE.MeshStandardMaterial({ color: '#d2ccaf', roughness: 1 });
   const waterMaterial = new THREE.MeshStandardMaterial({ color: '#708e85', roughness: 0.35, metalness: 0.1, side: THREE.DoubleSide });
   const centerX=(data.bounds.minX+data.bounds.maxX)/2,centerZ=(data.bounds.minZ+data.bounds.maxZ)/2;
-  const groundGeometry = new THREE.PlaneGeometry(data.bounds.maxX-data.bounds.minX+20,data.bounds.maxZ-data.bounds.minZ+20,terrain?80:1,terrain?80:1);
+  // A nearby flat patch avoids huge-triangle depth precision hiding roads far from the origin.
+  const groundWidth=terrain?data.bounds.maxX-data.bounds.minX+20:Math.min(2400,data.bounds.maxX-data.bounds.minX+20);
+  const groundDepth=terrain?data.bounds.maxZ-data.bounds.minZ+20:Math.min(2400,data.bounds.maxZ-data.bounds.minZ+20);
+  const groundGeometry = new THREE.PlaneGeometry(groundWidth,groundDepth,terrain?80:1,terrain?80:1);
   groundGeometry.rotateX(-Math.PI/2);
   if(terrain){const positions=groundGeometry.getAttribute('position');for(let i=0;i<positions.count;i++)positions.setY(i,heightAt(positions.getX(i)+centerX,positions.getZ(i)+centerZ));groundGeometry.computeVertexNormals();}
   const ground = new THREE.Mesh(groundGeometry,townMaterial('#9cb57c'));
   ground.name=terrain?'DEM terrain surface':'Flat map ground';
   ground.position.set(centerX,-0.025,centerZ);
   const groundUv=ground.geometry.getAttribute('uv');
-  for(let i=0;i<groundUv.count;i++)groundUv.setXY(i,groundUv.getX(i)*(data.bounds.maxX-data.bounds.minX)/4,groundUv.getY(i)*(data.bounds.maxZ-data.bounds.minZ)/4);
+  for(let i=0;i<groundUv.count;i++)groundUv.setXY(i,groundUv.getX(i)*groundWidth/4,groundUv.getY(i)*groundDepth/4);
   ground.receiveShadow=true;root.add(ground);
   interface Batch { geometries: THREE.BufferGeometry[]; material: THREE.Material; detail: boolean }
   interface Chunk { group: THREE.Group; x: number; z: number; batches: Map<string, Batch>; radius: number; detail: THREE.Mesh[] }
@@ -204,6 +207,7 @@ export function createOsmWorld(scene: THREE.Scene, data: OsmMap, missionOverride
     colliders, heightAt, roadSurface, isBlocked, spawn: stops.spawn, pickup: stops.pickup, dropoff: stops.dropoff, tea: null,
     mission: { pickupName: stops.pickupName, dropoffName: stops.dropoffName, route: stops.route }, chunkCount: chunks.size,
     update(_elapsed, cameraPosition, lowDetail = false) {
+      if(!terrain){ground.position.x=Math.round(cameraPosition.x/600)*600;ground.position.z=Math.round(cameraPosition.z/600)*600;}
       for (const chunk of chunks.values()) {
         const distance = Math.hypot(cameraPosition.x - chunk.x, cameraPosition.z - chunk.z);
         chunk.group.visible = distance < (lowDetail ? 220 : 330) + chunk.radius;

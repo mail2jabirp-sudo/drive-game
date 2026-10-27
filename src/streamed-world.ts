@@ -1,19 +1,21 @@
 import * as THREE from 'three';
 import type { MapPoint, OsmMap } from './osm-types';
 import { createOsmWorld } from './osm-world';
+import {districtRide} from './route-save';
+import type {OsmRide} from './route-save';
 import { selectMissionStops } from './osm-navigation';
 import { elevationSampler } from './elevation';
 import type { ElevationGrid } from './elevation';
-import { RoadTileStore } from './road-tiles';
+import { RoadTileStore,nearbyTileKeys } from './road-tiles';
 import type { RoadManifest } from './road-tiles';
 
 /** Loads/disposes a bounded local road window; the raw export never enters the browser. */
-export async function createStreamedRoadWorld(scene:THREE.Scene, restore?:MapPoint & {mapId?:string}) {
-  const response=await fetch(`${import.meta.env.BASE_URL}maps/malappuram/manifest.json`);
+export async function createStreamedRoadWorld(scene:THREE.Scene, saved?:OsmRide, legacy?:OsmRide, previousWorld?:string|null) {
+  const response=await fetch(`${import.meta.env.BASE_URL}maps/district/manifest.json`);
   if(!response.ok)throw new Error('Road manifest unavailable');
   const manifest=await response.json() as RoadManifest;
   if(manifest.version!==1||manifest.tileSize!==600||!manifest.source?.sha256||!manifest.tiles)throw new Error('Invalid road manifest');
-  if(restore?.mapId !== manifest.source.sha256) restore=undefined;
+  const restore=districtRide(saved??null,legacy??null,previousWorld??null,manifest)??undefined;
   let terrainSource: ElevationGrid['source']|undefined;
   let terrain: {heightAt:(x:number,z:number)=>number}|undefined;
   if(new URLSearchParams(location.search).get('terrain')==='1'){
@@ -27,10 +29,10 @@ export async function createStreamedRoadWorld(scene:THREE.Scene, restore?:MapPoi
   }
   const store=new RoadTileStore(manifest);
   await store.load({x:0,z:0});
-  const data:OsmMap={version:1,source:manifest.source,projection:manifest.projection,bounds:manifest.bounds,roads:store.roads(),buildings:[],landmarks:[],water:[],intersections:[],stats:manifest.stats};
+  const data:OsmMap={version:1,source:manifest.source,projection:manifest.projection,bounds:manifest.bounds,...store.features(),intersections:[],stats:manifest.stats};
   const fixed=selectMissionStops(data);
   fixed.pickupName='Malappuram-area mapped road stop';fixed.dropoffName='Connected mapped road stop';
-  if(restore && Math.abs(restore.x)<2400 && Math.abs(restore.z)<2400){await store.load(restore);data.roads=store.roads();}
+  if(restore && restore.x>manifest.bounds.minX&&restore.x<manifest.bounds.maxX&&restore.z>manifest.bounds.minZ&&restore.z<manifest.bounds.maxZ){if(nearbyTileKeys(manifest,restore).length)await store.load(restore);Object.assign(data,store.features());}
   let active=createOsmWorld(scene,data,fixed,terrain);
   let loadedKey=store.key(restore && store.hasPosition(restore.x,restore.z)?restore:{x:0,z:0});
   let loading=false;let error='';let retryAt=0;let disposed=false;
@@ -41,7 +43,7 @@ export async function createStreamedRoadWorld(scene:THREE.Scene, restore?:MapPoi
     try {
       await store.load(point);
       if(disposed)return;
-      data.roads=store.roads();
+      Object.assign(data,store.features());
       // Build next geometry before removing the previous window.
       const next=createOsmWorld(scene,data,fixed,terrain);active.dispose();active=next;
       loadedKey=key;error='';
@@ -51,7 +53,7 @@ export async function createStreamedRoadWorld(scene:THREE.Scene, restore?:MapPoi
   const world={
     get colliders(){return active.colliders;},
     get chunkCount(){return active.chunkCount;},
-    spawn:fixed.spawn,pickup:fixed.pickup,dropoff:fixed.dropoff,tea:null,
+    spawn:fixed.spawn,pickup:fixed.pickup,dropoff:fixed.dropoff,tea:manifest.teaStop??null,
     mission:{pickupName:fixed.pickupName,dropoffName:fixed.dropoffName,route:fixed.route},
     heightAt:(x:number,z:number)=>active.heightAt(x,z),
     roadSurface:(x:number,z:number)=>active.roadSurface(x,z),
@@ -61,5 +63,5 @@ export async function createStreamedRoadWorld(scene:THREE.Scene, restore?:MapPoi
     get streaming(){return {resident:store.resident.size,total:Object.keys(manifest.tiles).length,loading,error,keys:[...store.resident.keys()]};},
     refresh,
   };
-  return {world,data,manifest,terrainSource};
+  return {world,data,manifest,terrainSource,restoredRide:restore};
 }

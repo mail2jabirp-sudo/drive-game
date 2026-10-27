@@ -38,7 +38,7 @@ test('production HTML, hashed bundles, geographic data and license notice are pu
   expect(files).not.toContain('export.osm');
 });
 
-for (const mode of ['osm', 'practice', 'malappuram'] as const) {
+for (const mode of ['', '?world=osm', '?world=practice', '?world=malappuram'] as const) {
   test(`compiled ${mode} game loads, drives, saves and reloads without failed local assets`, async ({ page }) => {
     const errors: string[] = [];
     const failedAssets: string[] = [];
@@ -48,15 +48,17 @@ for (const mode of ['osm', 'practice', 'malappuram'] as const) {
     });
     page.on('requestfailed', request => failedAssets.push(request.url()));
     await page.addInitScript(() => localStorage.setItem('en3d.display.v1', 'low'));
-    const mapResponse = mode === 'osm' ? page.waitForResponse(response => response.url().endsWith('/maps/kottakkal.json') && response.status() === 200) : null;
-    await page.goto(`/?world=${mode}`);
+    const mapResponse = page.waitForResponse(response => response.url().endsWith('/maps/district/manifest.json') && response.status() === 200);
+    await page.goto(`/${mode}`);
     if (mapResponse) await mapResponse;
     await expect(page.locator('#start-button')).toBeEnabled();
     await page.locator('#start-button').click();
     await expect(page.locator('#fatal-error')).toBeHidden();
     await expect(page.locator('#start-screen')).toBeHidden();
-    await expect(page.locator('#mission-title')).toHaveText(mode === 'malappuram' ? 'Malappuram road fare' : mode === 'osm' ? 'Kottakkal road fare' : 'A ride to the market');
-    if (mode === 'osm') await expect(page.locator('#map-attribution')).toBeVisible();
+    await expect(page.locator('#mission-title')).toHaveText('Malappuram District fare');
+    await expect(page.locator('#map-attribution')).toBeVisible();
+    await expect(page.locator('#world-select')).toHaveCount(0);
+    await expect(page.locator('#change-area')).toHaveCount(0);
     await page.keyboard.down('KeyW');
     await expect.poll(async () => Number(await page.locator('#speed').textContent())).toBeGreaterThan(8);
     await page.keyboard.up('KeyW');

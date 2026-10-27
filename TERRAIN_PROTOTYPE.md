@@ -1,5 +1,7 @@
 # Phase 1 terrain and roads checkpoint
 
+**Historical small-window checkpoint:** the current sole playable world is now the expanded district described in [DISTRICT_WORLD.md](DISTRICT_WORLD.md). There are no separate map choices. The single-tile DEM procedure below is retained for reference and is not sufficient for the new 36km window; real district terrain remains pending.
+
 This is an incremental development branch based on main `3d601e9`. **Real elevation integration is blocked, not complete.** The default playable maps remain flat. No synthetic elevation is shipped. Do not merge this draft as a claim of real Kerala slopes.
 
 ## Verified coverage and preserved data

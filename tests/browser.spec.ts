@@ -1,179 +1,53 @@
-import { test, expect } from '@playwright/test';
-import type { Page } from '@playwright/test';
-const key = 'kottakkal-drive.v1';
-const seed = async (page: Page, value: object) => {
-  await page.evaluate(p => { window.name = 'e2e:' + JSON.stringify(p); }, value);
-};
-const start = async (page: Page) => {
-  await page.goto('/?world=practice');
-  await expect(page.locator('#start-button')).toBeEnabled();
-  await page.locator('#start-button').click();
-  await expect(page.locator('#start-screen')).toBeHidden();
-};
-test('render world, drive, brake, reverse, horn, pause and reset', async ({ page }) => {
-  const errors: string[] = [];
-  page.on('pageerror', e => errors.push(e.message));
-  await start(page);
-  await expect(page.locator('#fatal-error')).toBeHidden();
-  await expect(page.locator('#mission-title')).toHaveText('A ride to the market');
-  await page.keyboard.down('KeyW');
-  await expect.poll(async () => Number(await page.locator('#speed').textContent())).toBeGreaterThan(12);
-  await page.waitForTimeout(1400);
-  await page.keyboard.up('KeyW');
-  await page.keyboard.down('Space');
-  await expect(page.locator('#speed')).toHaveText('0');
-  await page.keyboard.up('Space');
-  await page.keyboard.press('KeyH');
-  await page.keyboard.press('KeyP');
-  await expect(page.locator('#pause-button')).toHaveAttribute('aria-label', 'Resume game');
-  const before = await page.evaluate(k => JSON.parse(localStorage.getItem(k)!), key);
-  expect(before.z).toBeLessThan(36);
-  await page.keyboard.down('KeyW'); await page.waitForTimeout(250); await page.keyboard.up('KeyW');
-  await expect(page.locator('#speed')).toHaveText('0');
-  await page.locator('#pause-button').click();
-  await page.keyboard.down('KeyS');
-  await expect.poll(async () => Number(await page.locator('#speed').textContent())).toBeGreaterThan(5);
-  await page.keyboard.up('KeyS');
-  await page.keyboard.press('KeyR');
-  await expect(page.locator('#speed')).toHaveText('0');
-  const reset = await page.evaluate(k => JSON.parse(localStorage.getItem(k)!), key);
-  expect(reset.x).toBe(72); expect(reset.z).toBe(36);
-  await page.screenshot({ path: 'test-results/desktop-game.png' });
-  expect(errors).toEqual([]);
-});
-test('pick up, retain passenger on reload, deliver and retain earnings', async ({ page }) => {
-  await page.goto('/');
-  await page.addInitScript(k => { if (window.name.startsWith('e2e:')) { localStorage.setItem(k, window.name.slice(4)); window.name = ''; } }, key);
-  await seed(page, {version:1,money:0,trips:0,phase:'pickup',x:72,z:-6,heading:0});
-  await start(page);
-  await expect(page.locator('#interact-button')).toBeEnabled();
-  await page.keyboard.press('KeyE');
-  await expect(page.locator('#mission-title')).toHaveText('Next stop: market');
-  await expect(page.locator('#money')).toHaveText('₹0');
-  await start(page);
-  await expect(page.locator('#mission-title')).toHaveText('Next stop: market');
-  // Move a real persisted save to the destination to exercise the delivery UI without a long automated drive.
-  const onboard = await page.evaluate(k => JSON.parse(localStorage.getItem(k)!), key);
-  await seed(page, { ...onboard, x: -18, z: -62, heading: Math.PI / 2 });
-  await start(page);
-  await expect(page.locator('#interact-button')).toBeEnabled();
-  await page.locator('#interact-button').click();
-  await expect(page.locator('#money')).toHaveText('₹120');
-  await expect(page.locator('#trips')).toHaveText('1');
-  await start(page);
-  await expect(page.locator('#money')).toHaveText('₹120');
-  await expect(page.locator('#trips')).toHaveText('1');
-});
-test('mobile touch pedals and steering are usable without overflow', async ({ browser }) => {
-  const context = await browser.newContext({viewport:{width:844,height:390}, isMobile:true, hasTouch:true});
-  const page = await context.newPage();
-  await start(page);
-  const throttle = page.locator('[data-control="throttle"]');
-  const bounds = await throttle.boundingBox(); expect(bounds).toBeTruthy();
-  await page.mouse.move(bounds!.x + bounds!.width / 2, bounds!.y + bounds!.height / 2);
-  await page.mouse.down();
-  await expect.poll(async () => Number(await page.locator('#speed').textContent())).toBeGreaterThan(10);
-  await page.mouse.up();
-  await page.locator('#reset-button').tap();
-  await expect(page.locator('#speed')).toHaveText('0');
-  await page.screenshot({path:'test-results/mobile-landscape.png'});
-  await page.setViewportSize({width:390,height:844});
-  await expect(page.locator('[data-control="left"]')).toBeVisible();
-  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-  await page.screenshot({path:'test-results/mobile-portrait.png'});
-  await context.close();
-});
-test('tea stop charges once, persists tea count, and preserves the active fare', async ({ page }) => {
-  await page.addInitScript(k => {
-    if (window.name.startsWith('e2e:')) { localStorage.setItem(k, window.name.slice(4)); window.name = ''; }
-  }, key);
-  await page.goto('/');
-  await seed(page, {version:1,money:120,trips:1,teaBreaks:0,phase:'dropoff',x:-72,z:20,heading:0});
-  await start(page);
-  await expect(page.locator('#tea-panel')).toBeVisible();
-  await page.locator('#tea-button').click();
-  await expect(page.locator('#money')).toHaveText('₹110');
-  await expect(page.locator('#tea-count')).toHaveText('1 tea break enjoyed');
-  await expect(page.locator('#mission-title')).toHaveText('Next stop: market');
-  await start(page);
-  await expect(page.locator('#money')).toHaveText('₹110');
-  await expect(page.locator('#tea-count')).toHaveText('1 tea break enjoyed');
-  await page.screenshot({path:'test-results/tea-stop.png'});
-  await page.setViewportSize({width:568,height:320});
-  await expect(page.locator('#mission-title')).toBeHidden();
-  await expect(page.locator('#tea-button')).toBeVisible();
-  const tea = await page.locator('#tea-panel').boundingBox();
-  const steering = await page.locator('[data-control="left"]').boundingBox();
-  expect(tea!.y + tea!.height).toBeLessThan(steering!.y);
-  await page.screenshot({path:'test-results/tea-small-landscape.png'});
+import {test,expect} from '@playwright/test';
+import {instrument,start,stoppedAt,interact} from './helpers/game';
+const key='kottakkal-drive.v1';
+
+test('the only world starts by default and retains driving, steering, reverse, horn, pause and reset',async({page})=>{
+ const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));await instrument(page);await start(page);
+ await expect(page.locator('#world-select')).toHaveCount(0);await expect(page.locator('#change-area')).toHaveCount(0);
+ await expect(page.locator('.practice-notice')).toContainText('partial coverage');
+ await expect(page.locator('#mission-title')).toHaveText('Malappuram District fare');
+ const spawn=await page.evaluate(()=>({...((window as any).__gameTest.car)}));
+ await page.keyboard.down('KeyW');await expect.poll(async()=>Number(await page.locator('#speed').textContent())).toBeGreaterThan(8);
+ await page.keyboard.down('KeyA');await expect.poll(()=>page.evaluate(()=>(window as any).__gameTest.car.steering)).toBeGreaterThan(0.1);
+ await page.keyboard.up('KeyA');await page.keyboard.up('KeyW');await page.keyboard.down('Space');await expect(page.locator('#speed')).toHaveText('0');await page.keyboard.up('Space');
+ await page.keyboard.press('KeyH');await page.keyboard.press('KeyP');await expect(page.locator('#pause-button')).toHaveAttribute('aria-label','Resume game');
+ await page.keyboard.down('KeyW');await page.keyboard.up('KeyW');await expect(page.locator('#speed')).toHaveText('0');
+ await page.locator('#pause-button').click();await page.keyboard.press('KeyR');
+ await page.keyboard.down('KeyS');await expect.poll(()=>page.evaluate(()=>(window as any).__gameTest.car.speed)).toBeLessThan(-1);
+ await page.keyboard.up('KeyS');await page.keyboard.press('KeyR');await expect(page.locator('#speed')).toHaveText('0');
+ const reset=await page.evaluate(()=>(window as any).__gameTest.car);expect(reset.x).toBeCloseTo(spawn.x);expect(reset.z).toBeCloseTo(spawn.z);
+ await page.screenshot({path:'test-results/district-desktop.png'});expect(errors).toEqual([]);
 });
 
-test('EN 3D preserves legacy saves, exposes honest map scope and bounds render cost', async ({ page }) => {
-  // Probe only the test response; the shipped game exposes no debug globals.
-  await page.route('**/src/main.ts*', async route => {
-    const response = await route.fetch();
-    const source = await response.text();
-    await route.fulfill({ response, body: source.replace('renderer.render(scene, camera);', `renderer.render(scene, camera);
-      window.__renderProbe = {
-        calls: renderer.info.render.calls, triangles: renderer.info.render.triangles,
-        shadows: renderer.shadowMap.enabled, chunks: landscape.chunkCount,
-        camera: camera.position.toArray(), car: [car.x, car.z], heading: car.heading,
-        roadClear: !world.colliders.some(b =>
-          [PICKUP, DROPOFF, SPAWN].some(p => blocked(p.x, p.z, [b])))
-      };`) });
-  });
-  await page.addInitScript(k => {
-    if (!localStorage.getItem(k)) localStorage.setItem(k, JSON.stringify({version:1,money:240,trips:2,phase:'dropoff',x:72,z:36,heading:0}));
-    if (!localStorage.getItem('en3d.display.v1')) localStorage.setItem('en3d.display.v1', 'low');
-  }, key);
-  const errors: string[] = [];
-  page.on('pageerror', error => errors.push(error.message));
-  await page.goto('/');
-  await expect(page).toHaveTitle(/EN 3D.*Kerala Open World Simulator/);
-  await expect(page.locator('.practice-notice')).toContainText('Fictional practice loop');
-  await page.screenshot({path:'test-results/en3d-welcome.png'});
-  await expect(page.locator('#start-button')).toBeEnabled();
-  await page.locator('#start-button').click();
-  await expect(page.locator('#money')).toHaveText('₹240');
-  await expect(page.locator('#mission-title')).toHaveText('Next stop: market');
-  await page.locator('#display-settings summary').click();
-  await expect(page.locator('#quality-select')).toHaveValue('low');
-  await expect(page.locator('#render-status')).toHaveText('Battery saver');
-  await expect.poll(async () => page.evaluate(() => (window as any).__renderProbe?.calls ?? 0)).toBeGreaterThan(20);
-  const probe = await page.evaluate(() => (window as any).__renderProbe);
-  expect(probe.shadows).toBe(false);
-  expect(probe.chunks).toBeGreaterThan(0);
-  expect(probe.calls).toBeLessThan(300);
-  expect(probe.triangles).toBeLessThan(200_000);
-  expect(probe.roadClear).toBe(true);
-  expect(probe.camera.every((n: number) => Number.isFinite(n))).toBe(true);
-  expect(probe.camera[1]).toBeGreaterThan(3);
-  console.log('EN 3D Battery saver rendering:', JSON.stringify(probe));
-  // Camera follows an actual short drive and the display control does not consume driving keys.
-  await page.locator('#display-settings summary').click();
-  await page.keyboard.down('KeyW');
-  await expect.poll(async () => Number(await page.locator('#speed').textContent())).toBeGreaterThan(10);
-  await page.keyboard.down('KeyA');
-  await expect.poll(async () => page.evaluate(() => (window as any).__renderProbe?.heading ?? 0)).toBeGreaterThan(0.02);
-  await page.keyboard.up('KeyA'); await page.keyboard.up('KeyW');
-  await page.keyboard.down('Space');
-  await expect(page.locator('#speed')).toHaveText('0');
-  await page.keyboard.up('Space');
-  await page.keyboard.press('KeyP');
-  const moved = await page.evaluate(k => JSON.parse(localStorage.getItem(k)!), key);
-  expect(moved.z).toBeLessThan(36);
-  expect(moved.heading).toBeGreaterThan(0);
-  expect(moved.money).toBe(240);
-  await page.screenshot({path:'test-results/en3d-game.png'});
-  await page.locator('#display-settings summary').click();
-  await page.locator('#quality-select').selectOption('auto');
-  expect(await page.evaluate(() => localStorage.getItem('en3d.display.v1'))).toBe('auto');
-  await page.locator('#quality-select').selectOption('low');
-  await page.setViewportSize({width:568,height:320});
-  await page.reload();
-  await expect(page.locator('#start-button')).toBeInViewport();
-  await expect(page.locator('.practice-notice')).toBeVisible();
-  await expect(page.locator('#quality-select')).toHaveValue('low');
-  await page.screenshot({path:'test-results/en3d-small-welcome.png'});
-  expect(errors).toEqual([]);
+test('legacy practice progress remains archived while its wallet and passenger continue in the district',async({page})=>{
+ const old={version:1,money:240,trips:2,teaBreaks:1,phase:'dropoff',x:72,z:-12,heading:0};
+ await page.addInitScript(p=>{if(!localStorage.getItem('kottakkal-drive.v1')){localStorage.setItem('kottakkal-drive.v1',JSON.stringify(p));localStorage.setItem('en3d.world.v1','practice');}},old);
+ await instrument(page);await start(page,'/?world=practice');await expect(page.locator('#mission-title')).toHaveText('Passenger aboard');
+ const stop=await page.evaluate(()=>(window as any).__gameTest.streamed.world.dropoff);await stoppedAt(page,stop);await interact(page);
+ await expect(page.locator('#money')).toHaveText('₹360');await page.reload();await page.locator('#start-button').click();await expect(page.locator('#money')).toHaveText('₹360');
+ const saved=await page.evaluate(k=>JSON.parse(localStorage.getItem(k)!),key);
+ expect(saved.x).toBe(old.x);expect(saved.z).toBe(old.z);expect(saved.phase).toBe(old.phase);expect(saved.teaBreaks).toBe(1);expect(saved.exportRide.phase).toBe('pickup');
+});
+
+test('mobile pedals and steering remain usable in landscape and portrait without a map selector',async({browser})=>{
+ const context=await browser.newContext({viewport:{width:844,height:390},deviceScaleFactor:0.75,isMobile:true,hasTouch:true});
+ try{
+  const page=await context.newPage();await instrument(page);await start(page);
+  const bounds=(await page.locator('[data-control="throttle"]').boundingBox())!;
+  await page.mouse.move(bounds.x+bounds.width/2,bounds.y+bounds.height/2);await page.mouse.down();
+  await expect.poll(async()=>Number(await page.locator('#speed').textContent())).toBeGreaterThan(5);await page.mouse.up();await page.locator('#reset-button').tap();
+  await expect(page.locator('[data-control="left"]')).toBeVisible();await page.setViewportSize({width:390,height:844});
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);await expect(page.locator('#world-select')).toHaveCount(0);
+  await page.screenshot({path:'test-results/district-mobile.png'});
+ }finally{await context.close();}
+});
+
+test('tea interaction is reused near a mapped cafe and preserves wallet, passenger and saved counters',async({page})=>{
+ await page.addInitScript(()=>{if(!localStorage.getItem('kottakkal-drive.v1'))localStorage.setItem('kottakkal-drive.v1',JSON.stringify({version:1,money:120,trips:1,teaBreaks:0,phase:'dropoff',x:72,z:36,heading:0}));});
+ await instrument(page);await start(page);
+ const stop=await page.evaluate(()=>(window as any).__gameTest.streamed.world.tea);expect(stop).toBeTruthy();await stoppedAt(page,stop);
+ await expect(page.locator('#tea-panel')).toBeVisible();await page.locator('#tea-button').click();await expect(page.locator('#money')).toHaveText('₹110');
+ await expect(page.locator('#tea-count')).toHaveText('1 tea break enjoyed');await expect(page.locator('#mission-title')).toHaveText('Passenger aboard');
+ await page.reload();await page.locator('#start-button').click();await expect(page.locator('#money')).toHaveText('₹110');await expect(page.locator('#tea-count')).toHaveText('1 tea break enjoyed');
 });
