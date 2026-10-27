@@ -13,7 +13,8 @@
     "map:import": "python3 scripts/import_osm.py",
     "map:check": "python3 scripts/check_map.py",
     "prebuild": "npm run map:check",
-    "predev": "npm run map:check"
+    "predev": "npm run map:check",
+    "test:production": "playwright test --config playwright.production.config.ts"
   },
   "dependencies": {
     "three": "^0.180.0"

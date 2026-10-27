@@ -1,0 +1,23 @@
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "24"
+  # Use a current Netlify build image with python3 for scripts/check_map.py.
+  # Keep devDependencies installed: TypeScript and Vite are build tools.
+
+# Vite fingerprints these filenames; retain old bundles across repeat visits.
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+# Map data has a stable filename: revalidate it when a new build is deployed.
+[[headers]]
+  for = "/maps/*"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+# Areas are selected with ?world=osm or ?world=practice on the root document.
+# No catch-all rewrite is needed; missing assets should remain missing assets.

@@ -44,3 +44,11 @@ The user's new phased roadmap supersedes the earlier traffic-first queue. This i
 ## Next manageable increment
 
 Review this small source-backed route on actual mobile hardware and against local references. Then add one direction/speed violation detector with incident deduplication and a clearly defined insufficient-wallet policy before fines or signal/NPC traffic. Keep the practice loop and both ride states intact. Manjeri/Kozhikode expansion remains data-backed future work; do not invent road geometry or landmark positions. See ROADMAP.md and DATA_LICENSES.md.
+
+## Netlify deployment preparation
+
+- Added repository-root netlify.toml: build command `npm run build`, publish directory `dist`, Node24. Use a current Netlify build image with Python3 for the existing map checksum step. No Python packages, secrets or backend are required. Do not omit devDependencies during installation.
+- Added immutable caching only for fingerprinted assets; stable map filenames revalidate. Query-string area selection needs no catch-all SPA rewrite. Existing asset paths, gameplay and source map data are unchanged.
+- Added a separate production Playwright configuration and `npm run test:production`, serving compiled dist on4173 rather than the source dev server. All3checks passed: every published file byte-for-byte/content types/source checksum/notices; real OSM game load/driving/save/reload; practice load/driving/save/reload. Clean npm ci, map freshness check, strict TypeScript and Vite build passed. Existing bundle advisory remains non-fatal.
+- Complete source was already synchronized on `codex/en3d-osm-kottakkal`; main still contains only the original map upload. Deployment configuration/tests/docs are pushed normally to that same review branch, preserving history. Choose that branch for Netlify or merge it into main before deploying main.
+- Remaining external step: import the repository in the user's Netlify account, authorize GitHub, select the correct branch/root/build/publish settings, and trigger a deploy. Actual Netlify build-image Python availability, deployed headers/HTTPS asset requests and real-phone performance must be checked on that first hosted deployment. No Netlify site has been created or deployed from this workspace. See DEPLOYMENT.md.

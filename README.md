@@ -81,6 +81,10 @@ Current excerpt: **68 road parts, 203 building footprints, 107 POIs, 70 shared-n
 
 **Next:** validate this small route on actual mobile hardware and against local references, then add one carefully tested traffic-rule increment (direction/posted-limit detection with incident deduplication and an explicit insufficient-wallet policy) before NPC traffic/signals or expansion. Manjeri/Kozhikode remain future data-backed stages. See [ROADMAP.md](ROADMAP.md).
 
+## Deploy on Netlify
+
+Use the repository-root `netlify.toml`: build **`npm run build`**, publish **`dist`**, Node **24**. Deploy `codex/en3d-osm-kottakkal`, or merge it into `main` first; `main` currently holds only the map upload. The build also needs Python 3 for its map checksum check. Run `npm run test:production` to smoke-test the compiled site. See [DEPLOYMENT.md](DEPLOYMENT.md) for setup, production asset checks and remaining account/deployment steps.
+
 ## GitHub synchronization
 
 GitHub `main` initially contained only the uploaded XML (`292f3b8`), while six local commits held the completed game. The histories were combined with an additive merge; both roots remain ancestors. Work is published to review branch **`codex/en3d-osm-kottakkal`** with normal pushes. `main` is intentionally unchanged; no force-push, reset or history replacement is used. Review/merge that branch to put the combined game on `main`. `PROGRESS.md` records the current checkpoint.
