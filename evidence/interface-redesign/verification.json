@@ -1,0 +1,14 @@
+{
+  "cameraMatched": true,
+  "poseMatched": true,
+  "quality": "low",
+  "viewport": [
+    1440,
+    900
+  ],
+  "drawCalls": 91,
+  "triangles": 16118,
+  "playerMeshes": 27,
+  "residentTiles": 9,
+  "runtimeErrors": []
+}
