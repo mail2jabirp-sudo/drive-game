@@ -4,9 +4,9 @@ import * as THREE from 'three';
 type Surface = 'asphalt' | 'plaster' | 'clay' | 'concrete' | 'earth';
 const wallColors = new Set(['#e4c590','#a8c4b5','#dda18a','#e6cd9c','#c2c8ae','#e0b794','#b8c4a4','#d1a594','#d8b59a','#b8c8bd','#d7c88f','#c8aca5','#e3be93','#a7c1b8','#dbac95','#d8c5a0','#abc2ab','#d4b9a5','#d4c799']);
 const palette: Record<string, string> = {
-  '#9cb57c':'#6f7d57', '#b7bf8d':'#8a8e70', '#535e60':'#43494a', '#c9c6ae':'#b8b7a8',
+  '#9cb57c':'#6b8054', '#b7bf8d':'#8a8e70', '#535e60':'#43494a', '#c9c6ae':'#b8b7a8',
   '#e4c590':'#d2c3a6', '#a8c4b5':'#a6b2a5', '#dda18a':'#c6ad9b', '#e6cd9c':'#cdc5ad',
-  '#c2c8ae':'#b9b9a8', '#e0b794':'#c9bba5', '#b8c4a4':'#b4b69e', '#d1a594':'#bdac9c',
+  '#c2c8ae':'#dedacb', '#e0b794':'#c9bba5', '#b8c4a4':'#b4b69e', '#d1a594':'#bdac9c',
   '#d8b59a':'#c6b6a3', '#b8c8bd':'#b5bcb2', '#d7c88f':'#c7c0a0', '#c8aca5':'#bcb0a5',
   '#e3be93':'#cabaa2', '#a7c1b8':'#aab7ad', '#dbac95':'#c3ac9b', '#d8c5a0':'#c6bca5',
   '#abc2ab':'#a9b3a2', '#d4b9a5':'#c1b3a5', '#d4c799':'#c4bda4', '#b76545':'#974e35',

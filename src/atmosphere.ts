@@ -5,8 +5,8 @@ export function createAtmosphere(scene: THREE.Scene): {update:(cameraPosition:TH
   const geometry = new THREE.SphereGeometry(480, 24, 12);
   const positions = geometry.getAttribute('position');
   const colors: number[] = [];
-  const horizon = new THREE.Color('#dfe5df');
-  const zenith = new THREE.Color('#80a6bc');
+  const horizon = new THREE.Color('#c2d4d5');
+  const zenith = new THREE.Color('#6f9ebc');
   const color = new THREE.Color();
   for (let i = 0; i < positions.count; i++) {
     const t = Math.pow(Math.max(0, positions.getY(i) / 480), 0.65);

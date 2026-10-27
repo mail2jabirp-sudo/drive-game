@@ -50,11 +50,16 @@ test('OSM world extrudes footprints north/south correctly, supports metre roads 
   const fixture:OsmMap={...source,roads:[road('r',['a','b','c'],[{x:0,z:0},{x:200,z:0},{x:400,z:0}])],buildings:[{id:'b',name:'',kind:'yes',height:9,heightSource:'tag',tags:{},points:[{x:50,z:30},{x:70,z:30},{x:70,z:45},{x:50,z:45}]}],landmarks:[],water:[],intersections:[]};
   const {scene,world}=createFixture(fixture);scene.updateMatrixWorld(true);
   let wallBounds:THREE.Box3|undefined;
-  scene.traverse(object=>{if(object instanceof THREE.Mesh&&object.castShadow)wallBounds=new THREE.Box3().setFromObject(object);});
+  scene.traverse(object=>{if(object instanceof THREE.Mesh&&(object.material as THREE.Material).name==='Verified footprint facades')wallBounds=new THREE.Box3().setFromObject(object);});
   assert.ok(wallBounds);
   assert.equal(wallBounds.min.x,50);assert.equal(wallBounds.max.x,70);
   assert.equal(wallBounds.min.z,30);assert.equal(wallBounds.max.z,45);
-  assert.ok(Math.abs(wallBounds.min.y)<1e-6);assert.ok(Math.abs(wallBounds.max.y-9)<1e-6);
+  assert.ok(Math.abs(wallBounds.min.y)<1e-6);assert.ok(wallBounds.max.y>0&&wallBounds.max.y<9);
+  let roofBounds:THREE.Box3|undefined;
+  scene.traverse(object=>{if(object instanceof THREE.Mesh&&(object.material as THREE.Material).name==='Approximate Kerala tiled roofs')roofBounds=new THREE.Box3().setFromObject(object);});
+  assert.ok(roofBounds);assert.equal(roofBounds.min.x,50);assert.equal(roofBounds.max.x,70);assert.equal(roofBounds.min.z,30);assert.equal(roofBounds.max.z,45);
+  assert.ok(Math.abs(roofBounds.max.y-9.025)<1e-4,'roof retains the mapped total building height');
+  assert.ok(roofBounds.min.y>=wallBounds.max.y,'roof meets the façade without descending through it');
   assert.equal(world.isBlocked(60,35),true);assert.equal(world.isBlocked(60,0),false);
   assert.equal(world.roadSurface(100,2),true);assert.equal(world.roadSurface(100,20),false);
   assert.equal(world.isBlocked(source.bounds.maxX+1,0),true);
