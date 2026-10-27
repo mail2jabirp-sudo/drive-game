@@ -6,7 +6,7 @@ test('the only world starts by default and retains driving, steering, reverse, h
  const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));await instrument(page);await start(page);
  await expect(page.locator('#world-select')).toHaveCount(0);await expect(page.locator('#change-area')).toHaveCount(0);
  await expect(page.locator('.practice-notice')).toContainText('partial coverage');
- await expect(page.locator('#mission-title')).toHaveText('Malappuram District fare');
+ await expect(page.locator('#mission-title')).toHaveText('Passenger fare');
  const spawn=await page.evaluate(()=>({...((window as any).__gameTest.car)}));
  await page.keyboard.down('KeyW');await expect.poll(async()=>Number(await page.locator('#speed').textContent())).toBeGreaterThan(8);
  await page.keyboard.down('KeyA');await expect.poll(()=>page.evaluate(()=>(window as any).__gameTest.car.steering)).toBeGreaterThan(0.1);

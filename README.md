@@ -1,6 +1,6 @@
 # EN 3D — എന്റെ നാട്
 
-**One Malappuram District driving world, with partial verified geographic coverage.**
+**Kerala Open World Simulator**
 
 The game automatically loads the same streamed district world for every player. There is no driving-area selector. Old `?world=osm`, `?world=practice` and `?world=malappuram` links all enter this world. Kottakkal is part of the same road network, not a selectable map.
 
