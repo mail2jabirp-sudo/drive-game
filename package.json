@@ -15,7 +15,8 @@
     "prebuild": "npm run map:check",
     "predev": "npm run map:check",
     "test:production": "playwright test --config playwright.production.config.ts",
-    "map:export": "python3 scripts/import_export_roads.py"
+    "map:export": "python3 scripts/import_export_roads.py",
+    "map:terrain": "python3 scripts/prepare_elevation.py"
   },
   "dependencies": {
     "three": "^0.180.0"
