@@ -24,3 +24,7 @@ One-way and numeric speed tags describe the uploaded data; they are not a statem
 ## Additional uploaded road export
 
 `export.osm` and `public/maps/malappuram/` are an additional OpenStreetMap source and adapted road database, also offered under ODbL1.0 with © OpenStreetMap contributors attribution. The source was reconstructed by binary concatenation of three user uploads, without changing bytes. SHA-256: `7915b6d48899723c3dd4a88dfd8c3db64d77e0e85e60d9e99511c2bb6b7ac3f2`. See ROAD_EXPORT.md, `data/EXPORT_PROVENANCE.json`, `scripts/import_export_roads.py` and the publicly distributed `maps/malappuram/NOTICE.txt`. The prior `map.osm` database is preserved with its own provenance. Only an initial 4.8km window is playable; no district completeness, real building positions in the road-only mode, elevation or current legal traffic status is claimed.
+
+## Elevation prototype (no dataset shipped yet)
+
+The optional HGT importer targets the public Mapzen/Tilezen composite archive. Download is currently proxy-blocked; no real or synthetic DEM is distributed with this checkpoint. See TERRAIN_PROTOTYPE.md for the exact candidate URL, public-domain USGS global source credits, source/license documentation and remaining contributor/datum verification. A later successful import records checksums, source URL and attribution separately; runtime displays its dataset credit alongside OSM attribution. Do not describe all composite elevation sources as MIT, Apache, or pure SRTM.

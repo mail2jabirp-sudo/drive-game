@@ -115,6 +115,8 @@ try {
   const landscape = isReal ? {update: (_camera:THREE.Vector3) => {}, setLowDetail: (_low:boolean) => {}, chunkCount:0} : createLandscape(scene);
   const realWorld = streamed?.world ?? (mapData ? createOsmWorld(scene, mapData) : null);
   const world = realWorld ?? createWorld(scene);
+  const groundHeight = (x:number,z:number) => realWorld?.heightAt(x,z) ?? 0;
+  const carHeight = () => groundHeight(car.x,car.z);
   const pickup = realWorld?.pickup ?? PICKUP;
   const dropoff = realWorld?.dropoff ?? DROPOFF;
   const spawn = realWorld?.spawn ?? {x:SPAWN.x,z:SPAWN.z,heading:0};
@@ -129,9 +131,10 @@ try {
     progress.phase = ride?.phase ?? 'pickup';
   }
   element('map-attribution').hidden = !isReal;
+  if(streamed?.terrainSource)element('map-attribution').append(document.createTextNode(` · Terrain: ${streamed.terrainSource.attribution}`));
   document.querySelector('.practice-notice')!.textContent = isExport ? 'Road-only export · nearby tiles · 4.8 km initial window, not the whole district.' : isReal ? 'OSM roads and footprints · approximate buildings and heights · flat terrain.' : 'Fictional practice loop · real map available in the area selector.';
   document.querySelector('.welcome-eyebrow')!.textContent = isExport ? 'MALAPPURAM ROAD EXPORT · NEARBY TILES' : isReal ? 'KOTTAKKAL · OPENSTREETMAP EXTRACT' : 'KOTTAKKAL INSPIRED · PRACTICE';
-  document.querySelector('.welcome-footer span:last-child')!.textContent = isExport ? 'VERIFIED SOURCE ROADS · FLAT TERRAIN' : isReal ? 'OSM GEOMETRY · APPROXIMATE BUILDING MODELS' : 'ORIGINAL FICTIONAL PRACTICE AREA';
+  document.querySelector('.welcome-footer span:last-child')!.textContent = isExport ? (streamed?.terrainSource ? 'SOURCE ROADS · DEM TERRAIN PROTOTYPE' : 'VERIFIED SOURCE ROADS · FLAT TERRAIN') : isReal ? 'OSM GEOMETRY · APPROXIMATE BUILDING MODELS' : 'ORIGINAL FICTIONAL PRACTICE AREA';
   document.querySelector('.map-heading > span')!.textContent = isExport ? 'MALAPPURAM · ROAD TILES' : isReal ? 'KOTTAKKAL · OSM' : 'FICTIONAL PRACTICE LOOP';
   const rickshaw = createRickshaw();
   scene.add(rickshaw.group);
@@ -150,8 +153,8 @@ try {
     scene.add(group);
     return group;
   }
-  const pickupMarker = missionMarker(0xf5b83c); pickupMarker.position.set(pickup.x,0,pickup.z);
-  const dropoffMarker = missionMarker(0x2da99a); dropoffMarker.position.set(dropoff.x,0,dropoff.z);
+  const pickupMarker = missionMarker(0xf5b83c); pickupMarker.position.set(pickup.x,groundHeight(pickup.x,pickup.z),pickup.z);
+  const dropoffMarker = missionMarker(0x2da99a); dropoffMarker.position.set(dropoff.x,groundHeight(dropoff.x,dropoff.z),dropoff.z);
   // A passenger appears in the cabin only while a fare is active.
   const passenger = new THREE.Group();
   const shirt = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.52, 0.33), new THREE.MeshStandardMaterial({ color: '#d36b4d' }));
@@ -167,6 +170,7 @@ try {
     for (const x of [-0.14,0.14]) {const leg = new THREE.Mesh(new THREE.BoxGeometry(0.17,0.7,0.22),trousers);leg.position.set(x,0.48,0);waitingPassenger.add(leg);}
     waitingPassenger.add(body,face);
     waitingPassenger.position.set(pickup.x-Math.cos(spawn.heading)*3,0,pickup.z+Math.sin(spawn.heading)*3);
+    waitingPassenger.position.y=groundHeight(waitingPassenger.position.x,waitingPassenger.position.z);
     scene.add(waitingPassenger);
   }
   const target = () => progress.phase === 'pickup' ? pickup : dropoff;
@@ -262,8 +266,8 @@ try {
   const lookAt = new THREE.Vector3();
   const smoothedLook = new THREE.Vector3();
   function snapCamera(): void {
-    camera.position.set(car.x + Math.sin(car.heading) * 10, 6.4, car.z + Math.cos(car.heading) * 10);
-    smoothedLook.set(car.x - Math.sin(car.heading) * 5, 1.2, car.z - Math.cos(car.heading) * 5);
+    camera.position.set(car.x + Math.sin(car.heading) * 10, carHeight()+6.4, car.z + Math.cos(car.heading) * 10);
+    smoothedLook.set(car.x - Math.sin(car.heading) * 5, carHeight()+1.2, car.z - Math.cos(car.heading) * 5);
     camera.lookAt(smoothedLook);
   }
   snapCamera();
@@ -385,22 +389,29 @@ try {
       }
       if (elapsed - lastSave > 2) { save(); lastSave = elapsed; }
     }
-    rickshaw.group.position.set(car.x, 0.08, car.z); rickshaw.group.rotation.y = car.heading;
+    rickshaw.group.position.set(car.x, carHeight()+0.08, car.z);
+    rickshaw.group.rotation.order='YXZ';rickshaw.group.rotation.y=car.heading;
+    const dx=-Math.sin(car.heading),dz=-Math.cos(car.heading);
+    const pitch=Math.atan2(groundHeight(car.x+dx,car.z+dz)-groundHeight(car.x-dx,car.z-dz),2);
+    const rx=Math.cos(car.heading),rz=-Math.sin(car.heading);
+    const roll=Math.atan2(groundHeight(car.x+rx,car.z+rz)-groundHeight(car.x-rx,car.z-rz),2);
+    rickshaw.group.rotation.x+=(pitch-rickshaw.group.rotation.x)*(1-Math.exp(-dt*8));
+    rickshaw.group.rotation.z+=(roll-rickshaw.group.rotation.z)*(1-Math.exp(-dt*8));
     rickshaw.animate(paused ? 0 : car.speed, car.steering, elapsed);
     if (realWorld) realWorld.update(elapsed, camera.position, graphics.lowDetail); else world.update(elapsed, camera.position);
     landscape.update(camera.position);
-    sun.position.set(car.x - 45, 70, car.z + 25);
-    sun.target.position.set(car.x, 0, car.z);
+    sun.position.set(car.x - 45, carHeight()+70, car.z + 25);
+    sun.target.position.set(car.x, carHeight(), car.z);
     pickupMarker.children[2].position.y = dropoffMarker.children[2].position.y = 5 + Math.sin(elapsed * 2) * 0.3;
-    desiredCamera.set(car.x + Math.sin(car.heading) * (10 + Math.abs(car.speed) * 0.07), 6.4 + Math.abs(car.speed) * 0.04, car.z + Math.cos(car.heading) * (10 + Math.abs(car.speed) * 0.07));
-    cameraRay.origin.set(car.x, 1.5, car.z);
+    desiredCamera.set(car.x + Math.sin(car.heading) * (10 + Math.abs(car.speed) * 0.07), carHeight()+6.4 + Math.abs(car.speed) * 0.04, car.z + Math.cos(car.heading) * (10 + Math.abs(car.speed) * 0.07));
+    cameraRay.origin.set(car.x, carHeight()+1.5, car.z);
     cameraRay.direction.copy(desiredCamera).sub(cameraRay.origin).normalize();
     let cameraDistance = cameraRay.origin.distanceTo(desiredCamera);
     for (const box of cameraObstacles) {
       if (cameraRay.intersectBox(box, cameraHit)) cameraDistance = Math.min(cameraDistance, Math.max(2.5, cameraRay.origin.distanceTo(cameraHit) - 0.6));
     }
     desiredCamera.copy(cameraRay.origin).addScaledVector(cameraRay.direction, cameraDistance);
-    lookAt.set(car.x - Math.sin(car.heading) * 5, 1.25, car.z - Math.cos(car.heading) * 5);
+    lookAt.set(car.x - Math.sin(car.heading) * 5, carHeight()+1.25, car.z - Math.cos(car.heading) * 5);
     camera.position.lerp(desiredCamera, 1 - Math.exp(-dt * 5));
     smoothedLook.lerp(lookAt, 1 - Math.exp(-dt * 8)); camera.lookAt(smoothedLook);
     audio.update(car.speed, started && !paused);
@@ -423,7 +434,10 @@ try {
   element('fatal-error').hidden = false;
   element('fatal-error').textContent = isExport ? 'Unable to load the uploaded road tiles or 3D graphics. Your saved progress is safe. ' : isReal ? 'Unable to load the real Kottakkal map or 3D graphics. Your saved progress is safe. ' : 'Unable to start 3D graphics. Enable hardware acceleration or use a WebGL-capable browser, then reload. ';
   if (isReal) {
-    const fallback = document.createElement('a'); fallback.href = '?world=practice'; fallback.textContent = 'Open the original practice game';
+    const fallback = document.createElement('a');
+    const terrainRequested=isExport&&new URLSearchParams(location.search).get('terrain')==='1';
+    if(terrainRequested) element('fatal-error').textContent='The terrain prototype requires a verified local DEM. Your saves are safe. ';
+    fallback.href = terrainRequested ? '?world=malappuram' : '?world=practice'; fallback.textContent = terrainRequested ? 'Open the flat Malappuram road map' : 'Open the original practice game';
     element('fatal-error').append(fallback);
   }
 }

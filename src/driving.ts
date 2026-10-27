@@ -9,6 +9,7 @@ export function blocked(x: number, z: number, boxes: Box[]): boolean {
   return Math.abs(x) > 115 || Math.abs(z) > 105 || boxes.some(b => x + r > b.minX && x - r < b.maxX && z + r > b.minZ && z - r < b.maxZ);
 }
 export interface DriveSurface {
+  heightAt?: (x:number,z:number)=>number;
   roadSurface: (x: number, z: number) => boolean;
   isBlocked: (x: number, z: number) => boolean;
 }
@@ -19,6 +20,11 @@ export function advanceCar(car: DriveState, input: Controls, dt: number, boxes: 
   if (input.brake) car.speed -= (car.speed > 0 ? 16 : 4) * dt;
   if (!input.throttle && !input.brake) car.speed = approach(car.speed, 0, (offroad ? 4.5 : 1.6) * dt);
   if (input.handbrake) car.speed = approach(car.speed, 0, 24 * dt);
+  if(surface?.heightAt && !input.handbrake && Math.abs(car.speed)>0.05){
+    const dx=-Math.sin(car.heading),dz=-Math.cos(car.heading);
+    const gradient=(surface.heightAt(car.x+dx*0.6,car.z+dz*0.6)-surface.heightAt(car.x-dx*0.6,car.z-dz*0.6))/1.2;
+    car.speed-=9.81*Math.sin(Math.atan(gradient))*dt;
+  }
   car.speed = Math.max(-6, Math.min(offroad ? 9 : 22, car.speed));
   const targetSteer = (Number(input.left) - Number(input.right)) * 0.52;
   car.steering += (targetSteer - car.steering) * Math.min(1, dt * 9);

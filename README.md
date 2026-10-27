@@ -104,3 +104,5 @@ Original code and generated artwork are MIT licensed; see `LICENSE`. Runtime dep
 ### Tea stop
 
 Chaya Kada is on the west side of the loop (the small terracotta map dot). Park in the circle outside the shop. Press E, use the mission interaction button, or tap **Have chai · ₹10**. Tea costs ₹10 and adds one saved tea break. It is optional, has no timer or performance bonus, and preserves your passenger. Complete a fare first to afford a cup.
+
+Terrain development checkpoint: see [TERRAIN_PROTOTYPE.md](TERRAIN_PROTOTYPE.md). Existing real-map roads now use mapped surface tags and authored gravel verges. Optional terrain rendering/driving is tested with synthetic fixtures, but the actual DEM download is blocked; the shipped geographic modes remain flat. No full-district or real-elevation claim is made.

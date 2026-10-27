@@ -6,7 +6,7 @@ const manifest=JSON.parse(readFileSync('public/maps/malappuram/manifest.json','u
 async function instrument(page:any){
   await page.route('**/src/main.ts*',async(route:any)=>{
     const response=await route.fetch();const source=await response.text();
-    await route.fulfill({response,body:source.replace('renderer.render(scene, camera);','renderer.render(scene, camera); window.__roadTest={car,streamed,renderer,camera};')});
+    await route.fulfill({response,body:source.replace('renderer.render(scene, camera);','renderer.render(scene, camera); window.__roadTest={car,streamed,renderer,camera,rickshaw,get elapsed(){return elapsed;},get lastInteraction(){return lastInteraction;}};')});
   });
   await page.addInitScript(()=>localStorage.setItem('en3d.display.v1','low'));
 }
@@ -54,4 +54,41 @@ test('an unavailable uploaded tile offers the preserved practice game without er
   expect(await page.evaluate(()=>JSON.parse(localStorage.getItem('kottakkal-drive.v1')!))).toEqual(old);
   await page.locator('#fatal-error a').click();await expect(page.locator('#start-button')).toBeEnabled();await page.locator('#start-button').click();
   await expect(page.locator('#money')).toHaveText('₹240');await expect(page.locator('#mission-title')).toHaveText('Next stop: market');
+});
+
+
+test('missing DEM offers the existing flat map without erasing saved progress',async({page})=>{
+  const old={version:1,money:240,trips:2,teaBreaks:1,phase:'dropoff',x:72,z:-12,heading:0};
+  await page.addInitScript(value=>localStorage.setItem('kottakkal-drive.v1',JSON.stringify(value)),old);
+  await page.route('**/maps/malappuram/terrain.json',route=>route.fulfill({status:404,body:'DEM deliberately unavailable'}));
+  await page.goto('/?world=malappuram&terrain=1');
+  await expect(page.locator('#fatal-error')).toContainText('verified local DEM');
+  expect(await page.evaluate(()=>JSON.parse(localStorage.getItem('kottakkal-drive.v1')!))).toEqual(old);
+  await page.locator('#fatal-error a').click();await expect(page.locator('#start-button')).toBeEnabled();
+  await page.locator('#start-button').click();await expect(page.locator('#money')).toHaveText('₹240');
+});
+
+test('synthetic test-only terrain keeps vehicle contact, camera, missions and bounded streaming working',async({page})=>{
+  // Explicit synthetic plane response only in this test; no geographic elevation artifact is generated.
+  const b=manifest.bounds,plane=(x:number,z:number)=>100+x*0.02+z*0.03;
+  const fixture={version:1,projection:manifest.projection,bounds:b,columns:2,rows:2,originElevation:100,
+    heights:[plane(b.minX,b.minZ),plane(b.maxX,b.minZ),plane(b.minX,b.maxZ),plane(b.maxX,b.maxZ)],
+    source:{url:'synthetic-test-only',sha256:'synthetic-test-only',tile:'N11E076',datum:'test metres',attribution:'TEST ONLY: not Kerala DEM'}};
+  const errors:string[]=[];page.on('pageerror',error=>errors.push(error.message));
+  await instrument(page);
+  await page.route('**/maps/malappuram/terrain.json',route=>route.fulfill({json:fixture}));
+  await page.goto('/?world=malappuram&terrain=1');await expect(page.locator('#start-button')).toBeEnabled();await page.locator('#start-button').click();
+  await expect(page.locator('#interact-button')).toBeEnabled();await page.keyboard.press('KeyE');
+  await expect(page.locator('#mission-title')).toHaveText('Passenger aboard');
+  await page.keyboard.down('KeyW');await expect.poll(async()=>Number(await page.locator('#speed').textContent())).toBeGreaterThan(5);
+  await page.keyboard.up('KeyW');await page.keyboard.down('Space');await expect(page.locator('#speed')).toHaveText('0');await page.keyboard.up('Space');
+  const observed=await page.evaluate(()=>{const t=(window as any).__roadTest;return {x:t.car.x,z:t.car.z,y:t.rickshaw.group.position.y,pitch:t.rickshaw.group.rotation.x,cameraY:t.camera.position.y,resident:t.streamed.world.streaming.resident,calls:t.renderer.info.render.calls,triangles:t.renderer.info.render.triangles};});
+  expect(observed.y).toBeCloseTo(observed.x*0.02+observed.z*0.03+0.08,3);
+  expect(Math.abs(observed.pitch)).toBeGreaterThan(0.001);expect(observed.cameraY).toBeGreaterThan(observed.y+3);
+  expect(observed.resident).toBeLessThanOrEqual(9);expect(observed.calls).toBeLessThan(300);expect(observed.triangles).toBeLessThan(200000);
+  console.log('Synthetic terrain render budget:',JSON.stringify(observed));
+  await page.evaluate(()=>{const t=(window as any).__roadTest;Object.assign(t.car,{...t.streamed.world.dropoff,speed:0});});
+  await expect.poll(()=>page.evaluate(()=>{const t=(window as any).__roadTest;return t.elapsed-t.lastInteraction;})).toBeGreaterThanOrEqual(1);
+  await expect(page.locator('#interact-button')).toBeEnabled();await page.keyboard.press('KeyE');await expect(page.locator('#money')).toHaveText('₹120');
+  await page.reload();await expect(page.locator('#start-button')).toBeEnabled();await page.locator('#start-button').click();await expect(page.locator('#money')).toHaveText('₹120');expect(errors).toEqual([]);
 });
