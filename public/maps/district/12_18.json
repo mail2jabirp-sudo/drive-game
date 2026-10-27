@@ -1,0 +1,1 @@
+{"version":1,"roads":[{"sourceWayId":"1224051030","name":"","highway":"residential","oneway":"no","maxspeed":null,"layer":0,"bridge":false,"width":5,"widthSource":"estimate","tags":{"highway":"residential"},"id":"1224051030:12,18:2","nodeIds":["clip:1224051030:7372.288:10800.0","11353748116"],"points":[{"x":7372.288,"z":10800.0},{"x":7363.74,"z":10845.679}]}]}
