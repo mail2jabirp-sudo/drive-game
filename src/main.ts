@@ -34,6 +34,8 @@ catch { storageAvailable = false; }
 const practicePose = {x:progress.x, z:progress.z, heading:progress.heading, phase:progress.phase};
 let osmRide = readOsmRide(rawSave);
 let exportRide = readOsmRide(rawSave,'exportRide');
+let savedRideAvailable=false;
+try{const saved=JSON.parse(rawSave??'null');savedRideAvailable=saved?.version===1&&Number.isFinite(saved.money)&&Number.isFinite(saved.trips);}catch{/* Invalid saves do not enable Continue. */}
 let mapId: string | null = null;
 let missionOrigin: {x:number;z:number}|undefined;
 // Legacy URLs and area preferences all enter the same geographic district world.
@@ -65,7 +67,8 @@ function save(): void {
   else { progress.x = car.x; progress.z = car.z; progress.heading = car.heading; }
   try {
     localStorage.setItem(SAVE_KEY, serializeRouteProgress(progress, isReal ? practicePose : null, osmRide, exportRide));
-    storageAvailable = true;
+    storageAvailable = true;savedRideAvailable=true;
+    if(mapId){element<HTMLButtonElement>('continue-button').disabled=false;element('continue-status').textContent=`₹${progress.money} · ${progress.trips} trips`;}
     element('save-status').textContent = 'Progress saved on this device';
   } catch {
     storageAvailable = false;
@@ -81,10 +84,10 @@ try {
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 0.92;
+  renderer.toneMappingExposure = 1.03;
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color('#dfe5df');
-  scene.fog = new THREE.Fog('#dfe5df', 130, 400);
+  scene.background = new THREE.Color('#c2d4d5');
+  scene.fog = new THREE.Fog('#c2d4d5', 170, 420);
   const atmosphere = createAtmosphere(scene);
   const camera = new THREE.PerspectiveCamera(52, 1, 0.1, 600);
   scene.add(new THREE.HemisphereLight('#d8e5ef', '#5b6650', 1.55));
@@ -134,7 +137,7 @@ try {
   element('map-attribution').hidden = !isReal;
   if(streamed?.terrainSource)element('map-attribution').append(document.createTextNode(` · Terrain: ${streamed.terrainSource.attribution}`));
   document.querySelector('.practice-notice')!.textContent = isExport ? 'Verified roads in a 36 km window · partial coverage, not the full district.' : isReal ? 'OSM roads and footprints · approximate buildings and heights · flat terrain.' : 'Fictional practice loop · real map available in the area selector.';
-  document.querySelector('.welcome-eyebrow')!.textContent = 'EN 3D';
+  document.querySelector('.welcome-eyebrow')!.textContent = 'THE ROAD FEELS LIKE HOME';
   document.querySelector('.welcome-footer span:first-child')!.textContent = BRAND_TITLE;
   document.querySelector('.welcome-footer span:last-child')!.textContent = SIMULATOR_SUBTITLE;
   document.querySelector('.map-heading > span')!.textContent = SIMULATOR_SUBTITLE;
@@ -145,7 +148,7 @@ try {
 
   const traffic=mapData&&realWorld?await createTraffic(scene,mapData,realWorld):null;
   const trafficSelect=element<HTMLSelectElement>('traffic-density');trafficSelect.value=traffic?.sim.density??'medium';
-  trafficSelect.addEventListener('change',()=>{traffic?.setDensity(readDensity(trafficSelect.value));trafficSelect.blur();});
+  trafficSelect.addEventListener('change',()=>{traffic?.setDensity(readDensity(trafficSelect.value));});
   element('clear-traffic').addEventListener('click',()=>{traffic?.clear();toast('Nearby traffic cleared. Your ride and fare are safe.');});
   const volume=element<HTMLInputElement>('audio-volume');
   try{const saved=JSON.parse(localStorage.getItem('en3d.audio.v1')??'{}');if(typeof saved.volume==='number'&&Number.isFinite(saved.volume))audio.volume=Math.max(0,Math.min(1,saved.volume));audio.muted=saved.muted===true;}catch{/* Optional audio preferences. */}
@@ -157,8 +160,8 @@ try {
     const group = new THREE.Group();
     const ring = new THREE.Mesh(new THREE.RingGeometry(3.4, 3.65, 48), new THREE.MeshBasicMaterial({ color, side: THREE.DoubleSide, transparent: true, opacity: 0.9 }));
     ring.rotation.x = -Math.PI / 2; ring.position.y = 0.12; group.add(ring);
-    const beam = new THREE.Mesh(new THREE.CylinderGeometry(3.5, 3.5, 3, 32, 1, true), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.07, side: THREE.DoubleSide, depthWrite: false }));
-    beam.position.y = 1.5; group.add(beam);
+    const beam = new THREE.Mesh(new THREE.CylinderGeometry(3.5,3.5,.7,24,1,true), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.025, side: THREE.DoubleSide, depthWrite: false }));
+    beam.position.y = .35; group.add(beam);
     const arrow = new THREE.Mesh(new THREE.ConeGeometry(0.65, 1.1, 4), new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.35 }));
     arrow.rotation.z = Math.PI; arrow.position.y = 5; group.add(arrow);
     scene.add(group);
@@ -215,7 +218,8 @@ try {
     const instruction=turnGuidance(navRoute,car);
     const arrow=element('gps-arrow');if(arrow.dataset.direction!==instruction.arrow){arrow.innerHTML=navigationIcon(instruction.arrow);arrow.dataset.direction=instruction.arrow;}
     element('gps-instruction').textContent=instruction.text;
-    element('gps-distance').textContent=navRoute.available?`${Math.round(instruction.distance)} m · ${progress.phase==='pickup'?'pickup':'drop-off'}`:'Waiting for connected road coverage';
+    const localTurn:Record<string,string>={'↰':'ഇടത്തോട്ട് തിരിയുക','↱':'വലത്തോട്ട് തിരിയുക','↶':'സുരക്ഷിതമായി തിരിയുക','↥':'റോഡിലേക്ക് മടങ്ങുക'};
+    element('gps-distance').textContent=navRoute.available?`${Math.round(instruction.distance)} m · ${progress.phase==='pickup'?'pickup':'drop-off'}${localTurn[instruction.arrow]?' · '+localTurn[instruction.arrow]:''}`:'Waiting for connected road coverage';
     const warning=element('road-warning'),signal=element('signal-status');warning.hidden=true;signal.hidden=true;
     if(!traffic)return;
     const ahead=(p:{x:number;z:number},range:number)=>Math.hypot(p.x-car.x,p.z-car.z)<range&&-(p.x-car.x)*Math.sin(car.heading)-(p.z-car.z)*Math.cos(car.heading)>-4;
@@ -271,24 +275,50 @@ try {
     element('pause-button').setAttribute('aria-label', paused ? 'Resume game' : 'Pause game');
     element('pause-button').title = paused ? 'Resume game (P)' : 'Pause game (P)';
     element('pause-button').setAttribute('aria-pressed', String(paused));
-    document.body.classList.toggle('paused', paused);
+    document.body.classList.toggle('paused', paused);element('pause-screen').hidden=!paused;
     if (paused) { audio.silence();save(); toast('Paused · press P or Resume to keep driving'); }
     else toast('Enjoy the ride.');
   }
   input = new Input(name => {
+    if(document.querySelector('dialog[open]'))return;
     if (name === 'pause') { pause(); return; }
+    if(name==='camera'){if(started&&!paused)switchCamera();return;}
     if (!started || paused) return;
     if (name === 'interact') interact();
     if (name === 'horn') audio.horn();
     if (name === 'reset') resetCar();
   });
-  element('start-button').addEventListener('click', () => {
-    started = true; paused = false; document.body.classList.remove('paused'); document.body.classList.add('playing');
-    element('start-screen').hidden = true; input.clear(); audio.start();
-    if (!storageAvailable) toast('Browser storage is unavailable. This ride will not be saved.');
-    else toast(progress.phase === 'dropoff' ? 'Welcome back! Your passenger is still aboard.' : isExport ? 'Malappuram source-road fare · stop in gold and press E.' : isReal ? 'Kottakkal road fare · stop in gold and press E to pick up.' : 'Welcome to Kottakkal. Your first passenger is up the road.');
-    save();
-    element<HTMLCanvasElement>('game').focus();
+  function beginDriving(){
+    resumeAfterDialog=false;document.querySelectorAll<HTMLDialogElement>('dialog[open]').forEach(d=>d.close());
+    started=true;paused=false;document.body.classList.remove('paused');document.body.classList.add('playing');
+    element('start-screen').hidden=true;element('pause-screen').hidden=true;input.clear();audio.start();snapCamera();
+    toast(!storageAvailable?'Storage unavailable · this ride cannot be saved.':progress.phase==='dropoff'?'Welcome back. Your passenger is still aboard.':'Stop at the gold ring and press E to pick up your passenger.');
+    save();element('game').focus();
+  }
+  element('start-button').addEventListener('click',beginDriving);
+  element('continue-button').addEventListener('click',()=>{if(savedRideAvailable)beginDriving();});
+  element('drive-auto').addEventListener('click',beginDriving);
+  element('resume-button').addEventListener('click',()=>{if(paused)pause();element('game').focus();});
+  element('menu-button').addEventListener('click',()=>{
+    save();input.clear();car.speed=0;started=false;paused=false;document.body.classList.remove('playing','paused');
+    element('pause-screen').hidden=true;element('start-screen').hidden=false;element('start-button').focus();
+  });
+  let resumeAfterDialog=false;
+  function openPanel(name:string){
+    const dialog=element<HTMLDialogElement>(`${name}-dialog`);if(!dialog)return;
+    resumeAfterDialog=started&&!paused;if(resumeAfterDialog)pause();input.clear();dialog.showModal();
+  }
+  document.querySelectorAll<HTMLButtonElement>('[data-panel]').forEach(b=>b.addEventListener('click',()=>openPanel(b.dataset.panel!)));
+  element('display-settings').addEventListener('click',()=>openPanel('settings'));
+  function finishDialog(dialog:HTMLDialogElement){
+    const resume=resumeAfterDialog;resumeAfterDialog=false;dialog.close();input.clear();
+    if(resume&&started&&paused){pause();element('game').focus();}
+  }
+  document.querySelectorAll<HTMLDialogElement>('dialog').forEach(dialog=>{
+    dialog.querySelectorAll<HTMLButtonElement>('[data-close]').forEach(b=>b.addEventListener('click',()=>finishDialog(dialog)));
+    dialog.addEventListener('cancel',e=>{e.preventDefault();finishDialog(dialog);});
+    dialog.addEventListener('close',()=>{const resume=resumeAfterDialog;resumeAfterDialog=false;input.clear();if(resume&&started&&paused){pause();element('game').focus();}});
+    dialog.addEventListener('click',e=>{const r=dialog.getBoundingClientRect();if(e.target===dialog&&(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom))finishDialog(dialog);});
   });
   element('interact-button').addEventListener('click', interact);
   element('reset-button').addEventListener('click', () => { if (started && !paused) resetCar(); });
@@ -298,11 +328,23 @@ try {
     element('sound-button').textContent = audio.muted ? '♩' : '♫';
     element('sound-button').setAttribute('aria-label', audio.muted ? 'Turn sound on' : 'Mute sound');
     element('sound-button').title = audio.muted ? 'Sound off · tap to enable' : 'Sound on · tap to mute';
-    element('sound-button').setAttribute('aria-pressed', String(audio.muted));
+    element('sound-button').setAttribute('aria-pressed', String(audio.muted));element('settings-mute').textContent=audio.muted?'Enable audio':'Mute audio';
   });
+  element('settings-mute').addEventListener('click',()=>element('sound-button').click());
+  element('settings-mute').textContent=audio.muted?'Enable audio':'Mute audio';
   window.addEventListener('pagehide', save);
   document.addEventListener('visibilitychange', () => { if (document.hidden && started) { save(); if (!paused) pause(); } });
 
+  let cameraMode:'chase'|'driver'='chase';
+  try{if(localStorage.getItem('en3d.camera.v1')==='driver')cameraMode='driver';}catch{/* Optional preference. */}
+  const cameraSelect=element<HTMLSelectElement>('camera-select');cameraSelect.value=cameraMode;
+  element('camera-button').setAttribute('aria-label',cameraMode==='chase'?'Switch to driver camera':'Switch to chase camera');
+  function setCamera(mode:string){cameraMode=mode==='driver'?'driver':'chase';cameraSelect.value=cameraMode;
+    element('camera-button').setAttribute('aria-label',cameraMode==='chase'?'Switch to driver camera':'Switch to chase camera');
+    try{localStorage.setItem('en3d.camera.v1',cameraMode);}catch{/* Optional preference. */}snapCamera();
+  }
+  function switchCamera(){setCamera(cameraMode==='chase'?'driver':'chase');}
+  cameraSelect.addEventListener('change',()=>setCamera(cameraSelect.value));element('camera-button').addEventListener('click',()=>{switchCamera();if(started&&!paused)element('game').focus();});
   let cameraColliderSource = world.colliders;
   let cameraObstacles = cameraColliderSource.map(b => new THREE.Box3(new THREE.Vector3(b.minX, 0, b.minZ), new THREE.Vector3(b.maxX, 17, b.maxZ)));
   const cameraRay = new THREE.Ray();
@@ -312,41 +354,44 @@ try {
   const lookAt = new THREE.Vector3();
   const smoothedLook = new THREE.Vector3();
   function snapCamera(): void {
-    camera.position.set(car.x + Math.sin(car.heading) * 10, carHeight()+6.4, car.z + Math.cos(car.heading) * 10);
-    smoothedLook.set(car.x - Math.sin(car.heading) * 5, carHeight()+1.2, car.z - Math.cos(car.heading) * 5);
-    camera.lookAt(smoothedLook);
+    camera.position.set(car.x+Math.sin(car.heading)*(cameraMode==='driver'?-.46:9),carHeight()+(cameraMode==='driver'?1.86:4.4),car.z+Math.cos(car.heading)*(cameraMode==='driver'?-.46:9));
+    smoothedLook.set(car.x-Math.sin(car.heading)*8,carHeight()+1.4,car.z-Math.cos(car.heading)*8);
+    camera.lookAt(smoothedLook);camera.fov=cameraMode==='driver'?68:window.innerWidth<600?62:56;camera.updateProjectionMatrix();
   }
   snapCamera();
   const resize = () => {
     renderer.setSize(window.innerWidth, window.innerHeight);
     camera.aspect = window.innerWidth / window.innerHeight;
-    camera.fov = window.innerWidth < 600 ? 62 : 52;
+    camera.fov = cameraMode==='driver'?68:window.innerWidth<600?62:56;
     camera.updateProjectionMatrix();
   };
   window.addEventListener('resize', resize); resize();
   element('loading').hidden = true;
   element<HTMLButtonElement>('start-button').disabled = false;
+  document.querySelectorAll<HTMLButtonElement>('[data-panel]').forEach(b=>b.disabled=false);
+  element<HTMLButtonElement>('continue-button').disabled=!savedRideAvailable;
+  element('continue-status').textContent=savedRideAvailable?`₹${progress.money} · ${progress.trips} trips`:'No saved ride yet';
 
   const map = element<HTMLCanvasElement>('minimap');
   const ctx = map.getContext('2d')!;
   function minimap(): void {
     const w = map.width, h = map.height;
     const scale = mapData ? Math.min(w / (mapData.bounds.maxX-mapData.bounds.minX+45), h / (mapData.bounds.maxZ-mapData.bounds.minZ+45)) : 0.91;
-    const viewScale = isExport ? 0.12 : scale;
+    const viewScale = isExport ? 0.42 : scale;
     const sx = (x: number) => w / 2 + (x - (isExport ? car.x : 0)) * viewScale;
     const sz = (z: number) => h / 2 + (z - (isExport ? car.z : 0)) * viewScale;
     ctx.clearRect(0, 0, w, h);
-    ctx.fillStyle = '#e0e6cf'; ctx.fillRect(0, 0, w, h);
-    ctx.fillStyle = '#c7d2b7';
-    for (const box of world.colliders) ctx.fillRect(sx(box.minX), sz(box.minZ), (box.maxX - box.minX) * scale, (box.maxZ - box.minZ) * scale);
+    ctx.fillStyle = '#20392f'; ctx.fillRect(0, 0, w, h);
+    ctx.fillStyle = '#365345';
+    for (const box of world.colliders) ctx.fillRect(sx(box.minX), sz(box.minZ), (box.maxX - box.minX) * viewScale, (box.maxZ - box.minZ) * viewScale);
     if (mapData) {
       ctx.lineJoin = 'round'; ctx.lineCap = 'round';
       for (const road of mapData.roads) {
-        ctx.strokeStyle = '#faf7e8'; ctx.lineWidth = Math.max(1.2,road.width*viewScale);
+        ctx.strokeStyle = '#718271'; ctx.lineWidth = Math.max(1.2,road.width*viewScale);
         ctx.beginPath(); road.points.forEach((p,i)=> i ? ctx.lineTo(sx(p.x),sz(p.z)) : ctx.moveTo(sx(p.x),sz(p.z))); ctx.stroke();
       }
       if (navRoute.available&&navRoute.points.length) {
-        ctx.strokeStyle = progress.phase==='pickup'?'#c08433':'#148e7c'; ctx.lineWidth = 3.8; ctx.beginPath();
+        ctx.strokeStyle = progress.phase==='pickup'?'#e1c476':'#89d5bb'; ctx.lineWidth = 3.8; ctx.beginPath();
         navRoute.points.forEach((p,i)=> i ? ctx.lineTo(sx(p.x),sz(p.z)) : ctx.moveTo(sx(p.x),sz(p.z))); ctx.stroke();
       }
     } else {
@@ -358,16 +403,16 @@ try {
       ctx.font = '9px sans-serif'; ctx.fillText('PRACTICE LOOP',w/2,h/2+11);
     }
     if (tea) {ctx.fillStyle = '#c97645'; ctx.beginPath(); ctx.arc(sx(tea.x),sz(tea.z),4,0,Math.PI*2);ctx.fill();}
-    for(const [point,label,color] of [[pickup,'P','#c08433'],[dropoff,'D','#148e7c']] as const){const x=sx(point.x),z=sz(point.z);ctx.fillStyle=color;ctx.beginPath();ctx.arc(x,z,5,0,Math.PI*2);ctx.fill();ctx.font='bold 11px sans-serif';ctx.fillText(label,x+7,z-5);}
-    ctx.beginPath(); ctx.arc(sx(target().x), sz(target().z), 6, 0, Math.PI * 2);
+    for(const [point,label,color] of [[pickup,'P','#c08433'],[dropoff,'D','#148e7c']] as const){const x=Math.max(10,Math.min(w-18,sx(point.x))),z=Math.max(16,Math.min(h-12,sz(point.z)));ctx.fillStyle=color;ctx.beginPath();ctx.arc(x,z,5,0,Math.PI*2);ctx.fill();ctx.font='bold 11px sans-serif';ctx.fillText(label,x+7,z-5);}
+    ctx.beginPath(); ctx.arc(Math.max(10,Math.min(w-18,sx(target().x))), Math.max(16,Math.min(h-12,sz(target().z))), 6, 0, Math.PI * 2);
     ctx.fillStyle = progress.phase === 'pickup' ? '#e9a52b' : '#198c7c'; ctx.fill();
     ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();
     ctx.save(); ctx.translate(sx(car.x), sz(car.z)); ctx.rotate(-car.heading);
     ctx.beginPath(); ctx.moveTo(0, -7); ctx.lineTo(5, 6); ctx.lineTo(0, 3); ctx.lineTo(-5, 6); ctx.closePath();
-    ctx.fillStyle = '#1c3833'; ctx.fill(); ctx.strokeStyle = 'white'; ctx.lineWidth = 1.5; ctx.stroke(); ctx.restore();
-    ctx.fillStyle='#294a3a';ctx.font='9px sans-serif';
+    ctx.fillStyle = '#eef4de'; ctx.fill(); ctx.strokeStyle = '#142b22'; ctx.lineWidth = 1.5; ctx.stroke(); ctx.restore();
+    ctx.fillStyle='#d0dfbd';ctx.font='9px sans-serif';
     for(const place of streamed?.manifest.places ?? []){const x=sx(place.x),z=sz(place.z);if(x>12&&x<w-40&&z>35&&z<h-15)ctx.fillText(place.nameMl ? `${place.name} · ${place.nameMl}` : place.name,x,z);}
-    ctx.fillStyle = '#687766'; ctx.font = 'bold 10px sans-serif'; ctx.fillText('N ↑', w - 20, 20);
+    ctx.fillStyle = '#d0dfbd'; ctx.font = 'bold 10px sans-serif'; ctx.fillText('N ↑', w - 20, 20);
   }
   function updateHud(): void {
     updateNavigation();
@@ -376,6 +421,8 @@ try {
     element('money').textContent = `₹${progress.money.toLocaleString('en-IN')}`;
     element('trips').textContent = String(progress.trips);
     element('speed').textContent = String(Math.round(Math.abs(car.speed) * 3.6));
+    element('drive-gear').textContent=Math.abs(car.speed)<.15?'N':car.speed<0?'R':'D';
+    element('vehicle-status').textContent=Math.abs(car.speed)<.15?'Stationary':input.controls.handbrake?'Handbrake':input.controls.brake&&car.speed>0?'Braking':car.speed<0?'Reversing':'Driving';
     const pickingUp = progress.phase === 'pickup';
     element('mission-title').textContent = isExport ? pickingUp ? 'Passenger fare' : 'Passenger aboard' : isReal ? pickingUp ? 'Kottakkal road fare' : 'Passenger aboard' : pickingUp ? 'A ride to the market' : 'Next stop: market';
     element('mission-description').textContent = realWorld ? pickingUp ? `Stop at ${realWorld.mission.pickupName}.` : `Follow the map route to ${realWorld.mission.dropoffName}.` : pickingUp ? 'A passenger is waiting outside the bakery. Pull into the gold circle.' : 'Passenger aboard. Follow the loop to the market bus stand and stop in the teal circle.';
@@ -390,6 +437,7 @@ try {
       element('location-label').textContent = nearbyPlace ? `${nearbyPlace.name}${nearbyPlace.nameMl ? ` · ${nearbyPlace.nameMl}` : ''}` : nearest?.road.name || nearest?.road.highway || SIMULATOR_SUBTITLE;
       element('road-rules').textContent = nearest ? `${nearest.road.oneway !== 'no' ? 'One-way · ' : ''}${nearest.road.maxspeed === null ? 'limit unmapped' : `${nearest.road.maxspeed} km/h OSM`}` : 'Road data unavailable';
     }
+    element('menu-location').textContent=element('location-label').textContent;
     const nearby = distance() <= 8;
     const nearTea = teaDistance() <= 9;
     element('tea-panel').hidden = teaDistance() > 21;
@@ -400,7 +448,7 @@ try {
     element<HTMLButtonElement>('interact-button').disabled = (!nearby && !nearTea) || Math.abs(car.speed) >= 2 || paused;
     element('interact-button').classList.toggle('ready', (nearby || nearTea) && Math.abs(car.speed) < 2);
     document.body.classList.toggle('has-passenger', !pickingUp);
-    pickupMarker.visible = pickingUp; dropoffMarker.visible = !pickingUp; passenger.visible = !pickingUp; waitingPassenger.visible = pickingUp&&waitingPassengerValid;
+    pickupMarker.visible = started&&pickingUp; dropoffMarker.visible = started&&!pickingUp; passenger.visible = !pickingUp; waitingPassenger.visible = pickingUp&&waitingPassengerValid;
     minimap();
   }
   let last: number | undefined;
@@ -411,10 +459,12 @@ try {
   const qualitySelect = element<HTMLSelectElement>('quality-select');
   qualitySelect.value = graphics.mode;
   function applyGraphics(): void {
-    renderer.setPixelRatio(graphics.lowDetail ? Math.min(window.devicePixelRatio, 0.85) : Math.min(window.devicePixelRatio, 1.5));
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio,graphics.lowDetail ? .85 : graphics.mode==='medium'?1.1:1.5));
+    const shadowSize=graphics.mode==='medium'?512:1024;
+    if(sun.shadow.mapSize.x!==shadowSize){sun.shadow.mapSize.set(shadowSize,shadowSize);sun.shadow.map?.dispose();sun.shadow.map=null;}
     renderer.shadowMap.enabled = !graphics.lowDetail;
     landscape.setLowDetail(graphics.lowDetail);
-    element('render-status').textContent = graphics.mode === 'low' ? 'Battery saver' : graphics.lowDetail ? 'Auto · reduced detail' : 'Auto · standard';
+    element('render-status').textContent = graphics.mode === 'low' ? 'Low · battery saver' : graphics.lowDetail ? 'Auto · reduced detail' : graphics.mode==='medium'?'Medium · balanced shadows':graphics.mode==='high'?'High · full detail':'Auto · standard';
     scene.traverse(object => {
       if (object instanceof THREE.Mesh) {
         const materials = Array.isArray(object.material) ? object.material : [object.material];
@@ -426,7 +476,6 @@ try {
     graphics.setMode(parseGraphicsMode(qualitySelect.value));
     applyGraphics();
     try { localStorage.setItem(DISPLAY_KEY, graphics.mode); } catch { /* Preferences are optional; gameplay storage reports failures separately. */ }
-    qualitySelect.blur();
   });
   applyGraphics();
   renderer.setAnimationLoop((now: number) => {
@@ -434,7 +483,7 @@ try {
     const dt = Math.min(realDt, 0.1); last = now;
     if (graphics.observeFrame(realDt)) applyGraphics();
     elapsed += dt;
-    traffic?.update(dt,car,graphics.lowDetail,started&&!paused);
+    traffic?.update(dt,car,graphics.lowDetail,!paused);
     if (started && !paused) {
       const steps = Math.max(1, Math.ceil(dt / (1 / 90)));
       for (let n = 0; n < steps; n++) {
@@ -453,7 +502,7 @@ try {
     const roll=Math.atan2(groundHeight(car.x+rx,car.z+rz)-groundHeight(car.x-rx,car.z-rz),2);
     rickshaw.group.rotation.x+=(pitch-rickshaw.group.rotation.x)*(1-Math.exp(-dt*8));
     rickshaw.group.rotation.z+=(roll-rickshaw.group.rotation.z)*(1-Math.exp(-dt*8));
-    rickshaw.animate(paused ? 0 : car.speed, car.steering, elapsed);
+    rickshaw.animate(paused ? 0 : car.speed, car.steering, elapsed,input.controls.brake||input.controls.handbrake);
     if (realWorld) realWorld.update(elapsed, camera.position, graphics.lowDetail); else world.update(elapsed, camera.position);
     landscape.update(camera.position);
     sun.position.set(car.x - 45, carHeight()+70, car.z + 25);
@@ -462,7 +511,7 @@ try {
     pickupMarker.children[2].visible=Math.hypot(car.x-pickup.x,car.z-pickup.z)>12;
     dropoffMarker.children[2].visible=Math.hypot(car.x-dropoff.x,car.z-dropoff.z)>12;
     pickupMarker.children[2].position.y = dropoffMarker.children[2].position.y = 5 + Math.sin(elapsed * 2) * 0.3;
-    desiredCamera.set(car.x + Math.sin(car.heading) * (10 + Math.abs(car.speed) * 0.07), carHeight()+6.4 + Math.abs(car.speed) * 0.04, car.z + Math.cos(car.heading) * (10 + Math.abs(car.speed) * 0.07));
+    desiredCamera.set(car.x+Math.sin(car.heading)*(9+Math.abs(car.speed)*.06),carHeight()+4.4+Math.abs(car.speed)*.025,car.z+Math.cos(car.heading)*(9+Math.abs(car.speed)*.06));
     cameraRay.origin.set(car.x, carHeight()+1.5, car.z);
     cameraRay.direction.copy(desiredCamera).sub(cameraRay.origin).normalize();
     let cameraDistance = cameraRay.origin.distanceTo(desiredCamera);
@@ -471,7 +520,19 @@ try {
       if (cameraRay.intersectBox(box, cameraHit)) cameraDistance = Math.min(cameraDistance, Math.max(2.5, cameraRay.origin.distanceTo(cameraHit) - 0.6));
     }
     desiredCamera.copy(cameraRay.origin).addScaledVector(cameraRay.direction, cameraDistance);
-    lookAt.set(car.x - Math.sin(car.heading) * 5, carHeight()+1.25, car.z - Math.cos(car.heading) * 5);
+    lookAt.set(car.x-Math.sin(car.heading)*7,carHeight()+1.4,car.z-Math.cos(car.heading)*7);
+    if(cameraMode==='driver'){
+      desiredCamera.set(car.x-Math.sin(car.heading)*.46,carHeight()+1.86,car.z-Math.cos(car.heading)*.46);
+      lookAt.set(car.x-Math.sin(car.heading)*20,carHeight()+1.55,car.z-Math.cos(car.heading)*20);
+    }
+    if(!started){
+      const orbit=matchMedia('(prefers-reduced-motion: reduce)').matches?0:Math.sin(elapsed*.08)*.12;
+      const angle=car.heading+orbit;
+      desiredCamera.set(car.x+Math.sin(angle)*8+Math.cos(angle)*7,carHeight()+3.6,car.z+Math.cos(angle)*8-Math.sin(angle)*7);
+      lookAt.set(car.x-Math.cos(car.heading)*3-Math.sin(car.heading)*2,carHeight()+1.3,car.z+Math.sin(car.heading)*3-Math.cos(car.heading)*2);
+    }
+    const targetFov=started?(cameraMode==='driver'?68:(window.innerWidth<600?62:56)+Math.min(4,Math.abs(car.speed)*.2)):50;
+    if(Math.abs(camera.fov-targetFov)>.02){camera.fov+=(targetFov-camera.fov)*(1-Math.exp(-dt*4));camera.updateProjectionMatrix();}
     camera.position.lerp(desiredCamera, 1 - Math.exp(-dt * 5));
     smoothedLook.lerp(lookAt, 1 - Math.exp(-dt * 8)); camera.lookAt(smoothedLook);
     audio.update(car.speed, started && !paused);

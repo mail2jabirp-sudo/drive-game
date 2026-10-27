@@ -16,33 +16,24 @@
     <div class="screen-grain" aria-hidden="true"></div>
 
     <header class="topbar">
-      <a class="brand" href="#" aria-label="EN 3D — എന്റെ നാട്">
+      <div class="brand" aria-label="EN 3D — എന്റെ നാട്">
         <span class="brand-mark" aria-hidden="true">
           <svg viewBox="0 0 44 44" fill="none"><path d="M11 15h22l3 17H8l3-17Z" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round"/><path d="m14 8-3 7h22l-3-7H14Z" fill="currentColor"/><path d="m15 19-1 7h16l-1-7H15Z" fill="currentColor"/><circle cx="13" cy="34" r="3" fill="currentColor"/><circle cx="31" cy="34" r="3" fill="currentColor"/><path d="M11 29h4m14 0h4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
         </span>
         <span class="brand-name"><span class="brand-title">EN <b>3D</b></span><span class="brand-local" lang="ml">എന്റെ നാട്</span></span>
-      </a>
+      </div>
       <div class="topbar-right game-ui">
         <div class="earnings" aria-label="Earnings and completed trips">
           <span class="wallet-symbol" aria-hidden="true">₹</span>
-          <div><span class="eyebrow">YOUR EARNINGS</span><strong id="money">₹0</strong></div>
+          <div><span class="eyebrow">WALLET</span><strong id="money">₹0</strong></div>
           <span class="earnings-rule"></span>
           <div class="trip-stat"><strong id="trips">0</strong><span class="eyebrow">TRIPS</span></div>
         </div>
         <div class="toolbar">
           <button id="sound-button" class="icon-button" aria-label="Toggle sound" title="Toggle sound">♫</button>
           <button id="pause-button" class="icon-button" aria-label="Pause game" title="Pause game" aria-pressed="false"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M5 3v10M11 3v10" stroke="currentColor" stroke-width="3"/></svg></button>
-          <details id="display-settings" class="display-settings">
-            <summary aria-label="Display" title="Display settings"><svg width="17" height="17" viewBox="0 0 20 20" aria-hidden="true"><path d="M3 4h14v10H3zM7 17h6M10 14v3" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg></summary>
-            <div class="display-popover">
-              <label for="quality-select">Graphics</label>
-              <select id="quality-select" aria-label="Graphics quality"><option value="auto">Auto</option><option value="low">Battery saver</option></select>
-              <label for="traffic-density">Traffic density</label><select id="traffic-density"><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option></select>
-              <span id="traffic-status" role="status">Loading nearby traffic…</span><button id="clear-traffic">Clear nearby traffic</button>
-              <label for="audio-volume">Audio volume</label><input id="audio-volume" type="range" min="0" max="1" step="0.05" value="0.65" /><small>Synthesized vehicle sounds</small>
-              <span id="render-status" role="status">Auto quality</span>
-            </div>
-          </details>
+          <button id="display-settings" class="icon-button" aria-label="Settings" title="Settings"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16M8 3v6M16 9v6M10 15v6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
+          <button id="camera-button" class="icon-button" aria-label="Switch to driver camera" title="Camera (C)"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M4 7h4l2-3h4l2 3h4v13H4z" fill="none" stroke="currentColor" stroke-width="1.7"/><circle cx="12" cy="13" r="4" fill="none" stroke="currentColor" stroke-width="1.7"/></svg></button>
           <button id="reset-button" class="icon-button reset-button" aria-label="Reset auto to the road" title="Reset auto to the road (R)">↺</button>
         </div>
       </div>
@@ -54,19 +45,17 @@
           <p class="welcome-eyebrow"><span></span> EN 3D</p>
           <h1>EN 3D — <span lang="ml">എന്റെ നാട്</span></h1>
           <p class="project-subtitle">Kerala Open World Simulator</p>
-          <p class="welcome-description">Drive mapped roads, carry passengers<br>and explore at your own pace.</p>
-          <p class="practice-notice">Verified roads in a 36 km window · partial district coverage.</p>
-          <button id="start-button" class="start-button" disabled>Let's drive <span aria-hidden="true"><svg width="20" height="20" viewBox="0 0 20 20"><path d="M4 16 16 4M4 4h12v12" fill="none" stroke="currentColor" stroke-width="2"/></svg></span></button>
-          <p id="loading" class="loading">Warming up your auto…</p>
-          <p class="welcome-save"><span aria-hidden="true">◈</span> Free to roam. Progress saved on this device.</p>
-          <div class="welcome-controls" aria-label="Keyboard controls">
-            <span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> or arrow keys to drive</span>
-            <span><kbd>E</kbd> Pick up / drop off <i>·</i> <kbd>H</kbd> Horn</span>
-            <span><kbd>Space</kbd> Handbrake <i>·</i> <kbd>R</kbd> Reset auto</span>
+          <p class="welcome-description">A familiar road. A new journey.</p>
+          <div class="menu-actions">
+            <button id="start-button" class="start-button" disabled>START DRIVING <span aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18"><path d="M4 12h16M14 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2"/></svg></span></button>
+            <button id="continue-button" class="secondary-button" disabled>CONTINUE <small id="continue-status">No saved ride yet</small></button>
+            <div class="menu-secondary"><button data-panel="vehicles" disabled>VEHICLES</button><button data-panel="settings" disabled>SETTINGS</button><button data-panel="controls" disabled>CONTROLS</button></div>
           </div>
-          <p class="touch-welcome">On a phone? Use the on-screen pedals and steering.</p>
+          <p id="loading" class="loading">Preparing nearby roads…</p>
+          <p class="practice-notice">Verified roads · partial coverage.</p>
+          <p class="welcome-save">Progress saves on this browser. Starting a ride keeps your earnings.</p>
         </div>
-        <div class="welcome-stamp" aria-hidden="true"><span>GOD'S OWN</span><strong>slow lane</strong><span>TAKE THE SCENIC ROUTE</span></div>
+        <div class="scene-caption"><span class="live-dot"></span><span id="menu-location">Your Kerala road journey</span><small>LIVE IN-GAME SCENE</small></div>
         <footer class="welcome-footer"><span>EN 3D — എന്റെ നാട്</span><span>Kerala Open World Simulator</span></footer>
       </section>
 
@@ -84,11 +73,11 @@
         <aside class="map-panel" aria-label="Town map">
           <div class="map-heading"><span>Kerala Open World Simulator</span><span class="north">N ↑</span></div>
           <canvas id="minimap" width="256" height="240" aria-label="Map showing your auto and mission destination"></canvas>
-          <p id="stream-status" class="map-attribution" hidden></p><p id="map-attribution" class="map-attribution" hidden>© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a> · <a href="https://opendatacommons.org/licenses/odbl/1-0/" target="_blank" rel="noopener">ODbL</a></p><div class="map-legend"><span><i class="legend-auto"></i>YOU</span><span><i class="legend-stop"></i>NEXT STOP</span></div>
+          <p id="map-attribution" class="map-attribution" hidden>© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a> · <a href="https://opendatacommons.org/licenses/odbl/1-0/" target="_blank" rel="noopener">ODbL</a></p><div class="map-legend"><span><i class="legend-auto"></i>YOU</span><span><i class="legend-stop"></i>NEXT STOP</span></div>
         </aside>
 
         <section class="mission-panel" aria-label="Current passenger mission">
-          <div class="mission-topline"><span class="eyebrow">A LITTLE LOCAL BUSINESS</span><span class="fare" id="mission-reward">+₹120</span></div>
+          <div class="mission-topline"><span class="eyebrow">PASSENGER MISSION</span><span class="fare" id="mission-reward">+₹120</span></div>
           <div class="mission-heading"><span class="mission-pin" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 20 20"><path d="M4 16 16 4M4 4h12v12" fill="none" stroke="currentColor" stroke-width="2"/></svg></span><h2 id="mission-title">Your first passenger</h2></div>
           <p id="mission-description">Head to the auto stand. Someone needs a ride to the market.</p>
           <div class="gps-guide" aria-label="Road navigation"><strong id="gps-arrow" aria-hidden="true">↑</strong><div><span id="gps-instruction">Finding a connected road route…</span><small id="gps-distance"></small></div></div>
@@ -97,9 +86,9 @@
           <div class="mission-route" aria-hidden="true"><span class="route-dot active"></span><span>Bakery</span><span class="route-line"></span><span class="route-dot"></span><span>Town market</span></div>
         </section>
 
-        <div class="speed-panel" aria-label="Speedometer"><span class="speed-label">EASY DOES IT</span><div><strong id="speed">0</strong><span>KM/H</span></div><span class="speed-road" aria-hidden="true">— — —</span></div>
+        <div class="speed-panel" aria-label="Speedometer"><span class="speed-label">PASSENGER AUTO</span><div><strong id="speed">0</strong><span>km/h</span></div><span class="speed-road"><b id="drive-gear">N</b><span id="vehicle-status">Stationary</span></span></div>
 
-        <div class="desktop-controls" aria-label="Driving controls"><span><kbd>W</kbd> Throttle</span><span><kbd>S</kbd> Brake / reverse</span><span><kbd>A</kbd><kbd>D</kbd> Steer</span><span><kbd>Space</kbd> Handbrake</span><span><kbd>H</kbd> Horn</span></div>
+        <div class="desktop-controls" aria-label="Driving controls"><span><kbd>W</kbd> Throttle</span><span><kbd>S</kbd> Brake / reverse</span><span><kbd>A</kbd><kbd>D</kbd> Steer</span><span><kbd>E</kbd> Passenger</span><span><kbd>C</kbd> Camera</span></div>
         <p id="save-status" class="save-status">◈ Saved on this device</p>
 
         <div class="touch-controls" aria-label="Touch driving controls">
@@ -109,6 +98,34 @@
         </div>
       </div>
 
+      <section id="pause-screen" class="pause-screen" aria-label="Paused game" hidden>
+        <div class="pause-card"><span class="eyebrow">EN 3D · എന്റെ നാട്</span><h2>Take a moment.</h2><p>Your journey is saved. The road will wait.</p>
+          <button id="resume-button" class="start-button">RESUME DRIVING <span aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18"><path d="M4 12h16M14 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2"/></svg></span></button>
+          <div class="pause-actions"><button data-panel="settings" disabled>Settings</button><button data-panel="controls" disabled>Controls</button><button id="menu-button">Main menu</button></div>
+        </div>
+      </section>
+      <dialog id="settings-dialog" class="game-dialog" aria-labelledby="settings-title">
+        <div class="dialog-heading"><div><span class="eyebrow">MAKE IT YOURS</span><h2 id="settings-title">Settings</h2></div><button class="dialog-close" data-close aria-label="Close settings">×</button></div>
+        <div class="settings-fields">
+          <label for="quality-select">Graphics <small>Auto adapts to sustained slow frames.</small></label><select id="quality-select"><option value="auto">Auto</option><option value="low">Low · battery saver</option><option value="medium">Medium</option><option value="high">High</option></select>
+          <label for="camera-select">Camera</label><select id="camera-select"><option value="chase">Chase camera</option><option value="driver">Driver camera</option></select>
+          <label for="traffic-density">Traffic density <small>Low graphics caps nearby vehicles at six.</small></label><select id="traffic-density"><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option></select>
+          <label for="audio-volume">Volume <small>Original synthesized vehicle sounds.</small></label><input id="audio-volume" type="range" min="0" max="1" step="0.05" value="0.65" />
+        </div>
+        <div class="settings-actions"><button id="settings-mute" class="secondary-button">Mute audio</button><button id="clear-traffic" class="secondary-button">Clear nearby traffic</button></div>
+        <p id="render-status" class="settings-status">Auto quality</p><p id="traffic-status" class="settings-status" role="status">Loading nearby traffic…</p><p id="stream-status" class="settings-status" hidden></p>
+        <button class="start-button dialog-done" data-close>DONE</button>
+      </dialog>
+      <dialog id="controls-dialog" class="game-dialog" aria-labelledby="controls-title">
+        <div class="dialog-heading"><div><span class="eyebrow">FIND YOUR RHYTHM</span><h2 id="controls-title">Driving controls</h2></div><button class="dialog-close" data-close aria-label="Close controls">×</button></div>
+        <dl class="controls-list"><div><dt><kbd>W</kbd> / <kbd>↑</kbd></dt><dd>Accelerate</dd></div><div><dt><kbd>S</kbd> / <kbd>↓</kbd></dt><dd>Brake, then reverse</dd></div><div><dt><kbd>A</kbd> <kbd>D</kbd> / <kbd>←</kbd> <kbd>→</kbd></dt><dd>Steer</dd></div><div><dt><kbd>Space</kbd></dt><dd>Handbrake</dd></div><div><dt><kbd>E</kbd></dt><dd>Pick up / drop off / tea</dd></div><div><dt><kbd>H</kbd></dt><dd>Horn</dd></div><div><dt><kbd>C</kbd></dt><dd>Change camera</dd></div><div><dt><kbd>P</kbd> / <kbd>Esc</kbd></dt><dd>Pause / resume</dd></div><div><dt><kbd>R</kbd></dt><dd>Recover to the road</dd></div></dl>
+        <p class="dialog-note">On touch screens, use the pedals, steering, horn and handbrake on screen. Stop inside the destination ring to help a passenger.</p><button class="start-button dialog-done" data-close>READY</button>
+      </dialog>
+      <dialog id="vehicles-dialog" class="game-dialog" aria-labelledby="vehicles-title">
+        <div class="dialog-heading"><div><span class="eyebrow">YOUR GARAGE</span><h2 id="vehicles-title">Passenger auto</h2></div><button class="dialog-close" data-close aria-label="Close vehicles">×</button></div>
+        <div class="vehicle-card"><span class="vehicle-badge">READY TO DRIVE</span><h3>Kerala's familiar three-wheeler.</h3><p>Black-and-yellow passenger autorickshaw. Free driving, passenger fares and roadside tea stops.</p><dl><div><dt>Drive</dt><dd>Three wheels</dd></div><div><dt>Mission</dt><dd>Passenger fares</dd></div></dl></div>
+        <p class="dialog-note">Bikes, scooters, cars, goods autos, vans, buses and lorries are AI traffic. Additional player vehicles are not available yet.</p><button id="drive-auto" class="start-button dialog-done">DRIVE THIS AUTO <span aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18"><path d="M4 12h16M14 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2"/></svg></span></button>
+      </dialog>
       <div id="toast" class="toast" role="status" aria-live="polite"></div>
       <div id="fatal-error" class="fatal-error" role="alert" hidden></div>
     </main>

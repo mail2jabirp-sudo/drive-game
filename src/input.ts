@@ -4,12 +4,15 @@ export class Input {
   private pointers = new Map<number, string>();
   constructor(private action: (name: string) => void) {
     window.addEventListener('keydown', e => {
+      if(document.querySelector('dialog[open]'))return;
       if (/^(INPUT|TEXTAREA|SELECT)$/.test((e.target as HTMLElement)?.tagName)) return;
+      if(/^(BUTTON|A)$/.test((e.target as HTMLElement)?.tagName)&&['Space','Enter'].includes(e.code))return;
       if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) e.preventDefault();
       this.keys.add(e.code);
       if (!e.repeat) {
         if (e.code === 'KeyE') action('interact');
         if (e.code === 'KeyH') action('horn');
+        if (e.code === 'KeyC') action('camera');
         if (e.code === 'KeyR') action('reset');
         if (e.code === 'Escape' || e.code === 'KeyP') action('pause');
       }

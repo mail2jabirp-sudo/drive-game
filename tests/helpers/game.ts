@@ -4,7 +4,7 @@ export async function instrument(page:Page){
  await page.addInitScript(()=>localStorage.setItem('en3d.display.v1','low'));
  await page.route('**/src/main.ts*',async route=>{
   const response=await route.fetch(),source=await response.text();
-  await route.fulfill({response,body:source.replace('renderer.render(scene, camera);','renderer.render(scene, camera); window.__gameTest={THREE,car,streamed,camera,renderer,scene,input,traffic,audio,get navigation(){return {route:navRoute,revision:navRevision};},get elapsed(){return elapsed;},get lastInteraction(){return lastInteraction;}};')});
+  await route.fulfill({response,body:source.replace('renderer.render(scene, camera);','renderer.render(scene, camera); window.__gameTest={THREE,car,streamed,camera,renderer,scene,input,traffic,audio,graphics,rickshaw,get cameraMode(){return cameraMode;},get paused(){return paused;},get navigation(){return {route:navRoute,revision:navRevision};},get elapsed(){return elapsed;},get lastInteraction(){return lastInteraction;}};')});
  });
 }
 export async function start(page:Page,path='/'){
