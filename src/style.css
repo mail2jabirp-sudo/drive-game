@@ -41,3 +41,8 @@ button:focus-visible,a:focus-visible,summary:focus-visible,select:focus-visible{
 
 .osm-mode .map-attribution{font-size:9px;line-height:1.45}.osm-mode .map-panel{pointer-events:auto}
 @media(max-height:540px){.osm-mode .map-panel{width:137px}.osm-mode .map-attribution{font-size:8px;line-height:1.35}}
+
+.vehicle-picker{display:block;max-width:100%;font:inherit;font-size:11px;color:var(--green);margin-bottom:7px}select.vehicle-picker{padding:7px;background:var(--cream);border:1px solid #a4af9e;border-radius:5px}.display-popover input{max-width:100%}.display-popover button{font:inherit;padding:6px;min-height:30px}.display-popover{max-height:70vh;overflow:auto}
+@media(max-height:540px){.vehicle-picker{font-size:9px;margin-bottom:4px}select.vehicle-picker{padding:4px}.welcome-copy h1{font-size:32px}}
+
+.free-driving .distance-caption,.free-driving .map-legend span:last-child{display:none}

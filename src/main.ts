@@ -4,13 +4,16 @@ import { createWorld, PICKUP, DROPOFF, SPAWN } from './world';
 import { createLandscape } from './landscape';
 import { createAtmosphere } from './atmosphere';
 import { DISPLAY_KEY, GraphicsBudget, parseGraphicsMode } from './graphics';
-import { createRickshaw } from './vehicle';
+import {createVehicleRig} from './vehicle-rig';
+import type {Indicator} from './vehicle-rig';
+import {DYNAMICS,readVehicle,withVehicle,canSwitchVehicle} from './garage';
+import type {VehicleId} from './garage';
 import { createStreamedRoadWorld } from './streamed-world';
 import { createOsmWorld } from './osm-world';
 import type { OsmMap } from './osm-types';
 import { nearestRoad } from './osm-navigation';
 import { WORLD_KEY, readOsmRide, serializeRouteProgress } from './route-save';
-import { advanceCar, blocked, onRoad } from './driving';
+import { advanceCar, blocked, onRoad, vehicleBlocked } from './driving';
 import type { DriveState } from './driving';
 import { Input } from './input';
 import { GameAudio } from './audio';
@@ -27,6 +30,7 @@ const practicePose = {x:progress.x, z:progress.z, heading:progress.heading, phas
 let osmRide = readOsmRide(rawSave);
 let exportRide = readOsmRide(rawSave,'exportRide');
 let mapId: string | null = null;
+let vehicleId:VehicleId=readVehicle(rawSave);
 // Legacy URLs and area preferences all enter the same geographic district world.
 let previousWorld: string|null=null;
 try {previousWorld=localStorage.getItem(WORLD_KEY);localStorage.setItem(WORLD_KEY,'malappuram');}catch{/* Optional preference only. */}
@@ -55,7 +59,7 @@ function save(): void {
   else if (isReal && mapId) osmRide = {version:1, mapId, x:car.x, z:car.z, heading:car.heading, phase:progress.phase};
   else { progress.x = car.x; progress.z = car.z; progress.heading = car.heading; }
   try {
-    localStorage.setItem(SAVE_KEY, serializeRouteProgress(progress, isReal ? practicePose : null, osmRide, exportRide));
+    localStorage.setItem(SAVE_KEY, withVehicle(serializeRouteProgress(progress, isReal ? practicePose : null, osmRide, exportRide),vehicleId));
     storageAvailable = true;
     element('save-status').textContent = 'Progress saved on this device';
   } catch {
@@ -127,7 +131,10 @@ try {
   document.querySelector('.welcome-eyebrow')!.textContent = isExport ? 'MALAPPURAM DISTRICT · മലപ്പുറം ജില്ല' : isReal ? 'KOTTAKKAL · OPENSTREETMAP EXTRACT' : 'KOTTAKKAL INSPIRED · PRACTICE';
   document.querySelector('.welcome-footer span:last-child')!.textContent = isExport ? (streamed?.terrainSource ? 'SOURCE ROADS · DEM TERRAIN PROTOTYPE' : 'VERIFIED SOURCE ROADS · FLAT TERRAIN') : isReal ? 'OSM GEOMETRY · APPROXIMATE BUILDING MODELS' : 'ORIGINAL FICTIONAL PRACTICE AREA';
   document.querySelector('.map-heading > span')!.textContent = isExport ? 'MALAPPURAM DISTRICT' : isReal ? 'KOTTAKKAL · OSM' : 'FICTIONAL PRACTICE LOOP';
-  const rickshaw = createRickshaw();
+  if(progress.phase==='dropoff')vehicleId='passenger-auto';
+  let rickshaw = createVehicleRig(vehicleId);
+  let headlights=false;let indicator:Indicator='off';
+  audio.setVehicle(vehicleId);
   scene.add(rickshaw.group);
   if (surface.isBlocked(car.x, car.z)) {
     car.x = spawn.x; car.z = spawn.z; car.heading = spawn.heading;
@@ -164,6 +171,27 @@ try {
     waitingPassenger.position.y=groundHeight(waitingPassenger.position.x,waitingPassenger.position.z);
     scene.add(waitingPassenger);
   }
+  const vehicleSelects=[element<HTMLSelectElement>('vehicle-select'),element<HTMLSelectElement>('vehicle-select-game')];
+  function syncVehicleSelectors(){for(const select of vehicleSelects)select.value=vehicleId;}
+  syncVehicleSelectors();
+  for(const select of vehicleSelects)select.addEventListener('change',()=>{
+    const next:VehicleId=select.value==='maruti800'?'maruti800':'passenger-auto';
+    if(!canSwitchVehicle(car.speed,progress.phase,next)){syncVehicleSelectors();toast(progress.phase==='dropoff'?'Finish the passenger fare before changing vehicles.':'Stop before changing vehicles.');return;}
+    if(next===vehicleId)return;
+    if(vehicleBlocked(car.x,car.z,car.heading,surface,DYNAMICS[next])){syncVehicleSelectors();toast('Move to a wider clear road before changing vehicle.');return;}
+    // Prepare before disposing; preserve the world, mission, pose and wallet.
+    const replacement=createVehicleRig(next);replacement.group.position.copy(rickshaw.group.position);replacement.group.rotation.copy(rickshaw.group.rotation);
+    replacement.group.add(passenger);scene.add(replacement.group);rickshaw.dispose();rickshaw=replacement;
+    vehicleId=next;car.speed=0;car.steering=0;audio.setVehicle(vehicleId);syncVehicleSelectors();save();updateHud();select.blur();
+  });
+  const volumeSelect=element<HTMLInputElement>('audio-volume');
+  try{const settings=JSON.parse(localStorage.getItem('en3d.audio.v1')??'{}');if(typeof settings.volume==='number')audio.volume=settings.volume;audio.muted=settings.muted===true;}catch{/* Optional preferences. */}
+  volumeSelect.value=String(audio.volume);
+  element('sound-button').textContent=audio.muted?'♩':'♫';element('sound-button').setAttribute('aria-pressed',String(audio.muted));element('sound-button').setAttribute('aria-label',audio.muted?'Turn sound on':'Mute sound');
+  const persistAudio=()=>{try{localStorage.setItem('en3d.audio.v1',JSON.stringify({volume:audio.volume,muted:audio.muted}));}catch{/* Optional preference. */}};
+  volumeSelect.addEventListener('input',()=>{audio.volume=Number(volumeSelect.value);persistAudio();});
+  element('headlights-button').addEventListener('click',()=>{headlights=!headlights;element('headlights-button').setAttribute('aria-pressed',String(headlights));});
+  element<HTMLSelectElement>('indicator-select').addEventListener('change',event=>{const value=(event.target as HTMLSelectElement).value;indicator=['left','right','hazard'].includes(value)?value as Indicator:'off';});
   const target = () => progress.phase === 'pickup' ? pickup : dropoff;
   const distance = () => Math.hypot(car.x - target().x, car.z - target().z);
 
@@ -186,7 +214,8 @@ try {
 
   function interact(): void {
     if (!started || paused || elapsed - lastInteraction < 1) return;
-    if (teaDistance() <= 9 && distance() > 8) { interactTea(); return; }
+    if (teaDistance() <= 9 && (vehicleId==='maruti800'||distance() > 8)) { interactTea(); return; }
+    if(vehicleId!=='passenger-auto'){toast('Free driving · choose the passenger auto while stopped to take a fare.');return;}
     lastInteraction = elapsed;
     const result = interactMission(progress, distance(), car.speed);
     if (result === 'pickup') {
@@ -225,7 +254,7 @@ try {
     started = true; paused = false; document.body.classList.remove('paused'); document.body.classList.add('playing');
     element('start-screen').hidden = true; input.clear(); audio.start();
     if (!storageAvailable) toast('Browser storage is unavailable. This ride will not be saved.');
-    else toast(progress.phase === 'dropoff' ? 'Welcome back! Your passenger is still aboard.' : isExport ? 'Malappuram source-road fare · stop in gold and press E.' : isReal ? 'Kottakkal road fare · stop in gold and press E to pick up.' : 'Welcome to Kottakkal. Your first passenger is up the road.');
+    else toast(vehicleId==='maruti800' ? 'Free driving · explore Malappuram District. Stop to change vehicles.' : progress.phase === 'dropoff' ? 'Welcome back! Your passenger is still aboard.' : isExport ? 'Malappuram source-road fare · stop in gold and press E.' : isReal ? 'Kottakkal road fare · stop in gold and press E to pick up.' : 'Welcome to Kottakkal. Your first passenger is up the road.');
     save();
     element<HTMLCanvasElement>('game').focus();
   });
@@ -233,7 +262,7 @@ try {
   element('reset-button').addEventListener('click', () => { if (started && !paused) resetCar(); });
   element('pause-button').addEventListener('click', pause);
   element('sound-button').addEventListener('click', () => {
-    audio.start(); audio.muted = !audio.muted;
+    audio.start(); audio.muted = !audio.muted;persistAudio();
     element('sound-button').textContent = audio.muted ? '♩' : '♫';
     element('sound-button').setAttribute('aria-label', audio.muted ? 'Turn sound on' : 'Mute sound');
     element('sound-button').title = audio.muted ? 'Sound off · tap to enable' : 'Sound on · tap to mute';
@@ -247,11 +276,12 @@ try {
   const cameraRay = new THREE.Ray();
   const cameraHit = new THREE.Vector3();
   const desiredCamera = new THREE.Vector3();
+  const audioForward = new THREE.Vector3();
   const lookAt = new THREE.Vector3();
   const smoothedLook = new THREE.Vector3();
   function snapCamera(): void {
-    camera.position.set(car.x + Math.sin(car.heading) * 10, carHeight()+6.4, car.z + Math.cos(car.heading) * 10);
-    smoothedLook.set(car.x - Math.sin(car.heading) * 5, carHeight()+1.2, car.z - Math.cos(car.heading) * 5);
+    camera.position.set(car.x + Math.sin(car.heading) * (vehicleId==='maruti800'?8.5:10), carHeight()+(vehicleId==='maruti800'?4.8:6.4), car.z + Math.cos(car.heading) * (vehicleId==='maruti800'?8.5:10));
+    smoothedLook.set(car.x - Math.sin(car.heading) * (vehicleId==='maruti800'?2.3:5), carHeight()+1.2, car.z - Math.cos(car.heading) * (vehicleId==='maruti800'?2.3:5));
     camera.lookAt(smoothedLook);
   }
   snapCamera();
@@ -283,7 +313,7 @@ try {
         ctx.strokeStyle = '#faf7e8'; ctx.lineWidth = Math.max(1.2,road.width*viewScale);
         ctx.beginPath(); road.points.forEach((p,i)=> i ? ctx.lineTo(sx(p.x),sz(p.z)) : ctx.moveTo(sx(p.x),sz(p.z))); ctx.stroke();
       }
-      if (realWorld?.mission.route.length) {
+      if (vehicleId==='passenger-auto' && realWorld?.mission.route.length) {
         ctx.strokeStyle = '#c08433'; ctx.lineWidth = 2.8; ctx.beginPath();
         realWorld.mission.route.forEach((p,i)=> i ? ctx.lineTo(sx(p.x),sz(p.z)) : ctx.moveTo(sx(p.x),sz(p.z))); ctx.stroke();
       }
@@ -296,9 +326,9 @@ try {
       ctx.font = '9px sans-serif'; ctx.fillText('PRACTICE LOOP',w/2,h/2+11);
     }
     if (tea) {ctx.fillStyle = '#c97645'; ctx.beginPath(); ctx.arc(sx(tea.x),sz(tea.z),4,0,Math.PI*2);ctx.fill();}
-    ctx.beginPath(); ctx.arc(sx(target().x), sz(target().z), 6, 0, Math.PI * 2);
+    if(vehicleId==='passenger-auto'){ctx.beginPath(); ctx.arc(sx(target().x), sz(target().z), 6, 0, Math.PI * 2);
     ctx.fillStyle = progress.phase === 'pickup' ? '#e9a52b' : '#198c7c'; ctx.fill();
-    ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();}
     ctx.save(); ctx.translate(sx(car.x), sz(car.z)); ctx.rotate(-car.heading);
     ctx.beginPath(); ctx.moveTo(0, -7); ctx.lineTo(5, 6); ctx.lineTo(0, 3); ctx.lineTo(-5, 6); ctx.closePath();
     ctx.fillStyle = '#1c3833'; ctx.fill(); ctx.strokeStyle = 'white'; ctx.lineWidth = 1.5; ctx.stroke(); ctx.restore();
@@ -324,7 +354,7 @@ try {
       element('location-label').textContent = nearbyPlace ? `${nearbyPlace.name}${nearbyPlace.nameMl ? ` · ${nearbyPlace.nameMl}` : ''}` : nearest?.road.name || nearest?.road.highway || 'Malappuram District';
       element('road-rules').textContent = nearest ? `${nearest.road.oneway !== 'no' ? 'One-way · ' : ''}${nearest.road.maxspeed === null ? 'limit unmapped' : `${nearest.road.maxspeed} km/h OSM`}` : 'Road data unavailable';
     }
-    const nearby = distance() <= 8;
+    const nearby = vehicleId==='passenger-auto' && distance() <= 8;
     const nearTea = teaDistance() <= 9;
     element('tea-panel').hidden = teaDistance() > 21;
     element('tea-count').textContent = `${progress.teaBreaks} tea break${progress.teaBreaks === 1 ? '' : 's'} enjoyed`;
@@ -334,7 +364,9 @@ try {
     element<HTMLButtonElement>('interact-button').disabled = (!nearby && !nearTea) || Math.abs(car.speed) >= 2 || paused;
     element('interact-button').classList.toggle('ready', (nearby || nearTea) && Math.abs(car.speed) < 2);
     document.body.classList.toggle('has-passenger', !pickingUp);
-    pickupMarker.visible = pickingUp; dropoffMarker.visible = !pickingUp; passenger.visible = !pickingUp; waitingPassenger.visible = pickingUp;
+    document.body.classList.toggle('free-driving',vehicleId==='maruti800');
+    pickupMarker.visible = vehicleId==='passenger-auto'&&pickingUp; dropoffMarker.visible = vehicleId==='passenger-auto'&&!pickingUp; passenger.visible = vehicleId==='passenger-auto'&&!pickingUp; waitingPassenger.visible = vehicleId==='passenger-auto'&&pickingUp;
+    if(vehicleId==='maruti800'){element('mission-title').textContent='Free driving';element('mission-description').textContent='Explore the same Malappuram District roads. Stop to change vehicle.';element('mission-reward').textContent='Maruti 800 prototype';element('mission-distance').textContent='No passenger fare';}
     minimap();
   }
   let last: number | undefined;
@@ -371,7 +403,7 @@ try {
     if (started && !paused) {
       const steps = Math.max(1, Math.ceil(dt / (1 / 90)));
       for (let n = 0; n < steps; n++) {
-        const hit = advanceCar(car, input.controls, dt / steps, world.colliders, realWorld ?? undefined);
+        const hit = advanceCar(car, input.controls, dt / steps, world.colliders, realWorld ?? undefined,DYNAMICS[vehicleId]);
         if (hit && elapsed - lastToast > 3) { toast('Easy there! Use R to get back on the road.'); lastToast = elapsed; }
       }
       if (elapsed - lastSave > 2) { save(); lastSave = elapsed; }
@@ -390,7 +422,7 @@ try {
     sun.position.set(car.x - 45, carHeight()+70, car.z + 25);
     sun.target.position.set(car.x, carHeight(), car.z);
     pickupMarker.children[2].position.y = dropoffMarker.children[2].position.y = 5 + Math.sin(elapsed * 2) * 0.3;
-    desiredCamera.set(car.x + Math.sin(car.heading) * (10 + Math.abs(car.speed) * 0.07), carHeight()+6.4 + Math.abs(car.speed) * 0.04, car.z + Math.cos(car.heading) * (10 + Math.abs(car.speed) * 0.07));
+    desiredCamera.set(car.x + Math.sin(car.heading) * ((vehicleId==='maruti800'?8.5:10) + Math.abs(car.speed) * 0.07), carHeight()+(vehicleId==='maruti800'?4.8:6.4) + Math.abs(car.speed) * 0.04, car.z + Math.cos(car.heading) * ((vehicleId==='maruti800'?8.5:10) + Math.abs(car.speed) * 0.07));
     cameraRay.origin.set(car.x, carHeight()+1.5, car.z);
     cameraRay.direction.copy(desiredCamera).sub(cameraRay.origin).normalize();
     let cameraDistance = cameraRay.origin.distanceTo(desiredCamera);
@@ -399,10 +431,12 @@ try {
       if (cameraRay.intersectBox(box, cameraHit)) cameraDistance = Math.min(cameraDistance, Math.max(2.5, cameraRay.origin.distanceTo(cameraHit) - 0.6));
     }
     desiredCamera.copy(cameraRay.origin).addScaledVector(cameraRay.direction, cameraDistance);
-    lookAt.set(car.x - Math.sin(car.heading) * 5, carHeight()+1.25, car.z - Math.cos(car.heading) * 5);
+    lookAt.set(car.x - Math.sin(car.heading) * (vehicleId==='maruti800'?2.3:5), carHeight()+1.25, car.z - Math.cos(car.heading) * (vehicleId==='maruti800'?2.3:5));
     camera.position.lerp(desiredCamera, 1 - Math.exp(-dt * 5));
     smoothedLook.lerp(lookAt, 1 - Math.exp(-dt * 8)); camera.lookAt(smoothedLook);
-    audio.update(car.speed, started && !paused);
+    rickshaw.updateLights(headlights,input.controls.brake||input.controls.handbrake,indicator,elapsed);
+    const forward=camera.getWorldDirection(audioForward);
+    audio.update(car.speed, started && !paused,{throttle:input.controls.throttle,braking:input.controls.brake,indicator:indicator!=='off',source:[car.x-camera.position.x,carHeight()+0.8-camera.position.y,car.z-camera.position.z],listenerForward:[forward.x,forward.y,forward.z]});
     hudClock += dt;
     if (hudClock > 0.1) { updateHud(); hudClock = 0; }
     atmosphere.update(camera.position);

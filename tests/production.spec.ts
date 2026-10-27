@@ -77,3 +77,14 @@ for (const mode of ['', '?world=osm', '?world=practice', '?world=malappuram'] as
     expect(failedAssets).toEqual([]);
   });
 }
+
+test('compiled compact-car prototype loads, drives, preserves wallet and restores its selection',async({page})=>{
+ const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));
+ await page.addInitScript(()=>localStorage.setItem('en3d.display.v1','low'));
+ await page.goto('/');await expect(page.locator('#start-button')).toBeEnabled();await page.locator('#vehicle-select').selectOption('maruti800');await page.locator('#start-button').click();
+ await expect(page.locator('#mission-title')).toHaveText('Free driving');await expect(page.locator('#world-select')).toHaveCount(0);
+ await page.keyboard.down('KeyW');await expect.poll(async()=>Number(await page.locator('#speed').textContent())).toBeGreaterThan(8);await page.keyboard.up('KeyW');
+ await page.keyboard.down('Space');await expect(page.locator('#speed')).toHaveText('0');await page.keyboard.up('Space');await page.keyboard.press('KeyP');
+ const save=await page.evaluate(()=>JSON.parse(localStorage.getItem('kottakkal-drive.v1')!));expect(save.vehicleId).toBe('maruti800');expect(save.money).toBe(0);expect(save.exportRide).toBeTruthy();
+ await page.reload();await page.locator('#start-button').click();await expect(page.locator('#mission-title')).toHaveText('Free driving');await expect(page.locator('#money')).toHaveText('₹0');expect(errors).toEqual([]);
+});

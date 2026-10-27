@@ -56,3 +56,7 @@ Default terrain is flat. Real DEM download remains proxy-blocked; no elevations 
 No district-wide buildings/landuse coverage, engineered bridge/tunnel elevations, AI traffic, working traffic lights/fines or pedestrian population is claimed. These are future increments requiring source verification and browser tests. Existing mapped one-way and speed tags are retained as data, not a guarantee of current traffic law. Building heights/materials, road widths without tags, shoulders and paint are visual estimates/artwork.
 
 © [OpenStreetMap contributors](https://www.openstreetmap.org/copyright). Derived geographic databases are **ODbL1.0**, separate from MIT application code. See [DATA_LICENSES.md](DATA_LICENSES.md). Application dependencies use MIT/Apache licensing; permissive BSD/ISC transitive build tools were approved by the user.
+
+## Vehicle development draft
+
+See [VEHICLES.md](VEHICLES.md) for the staged vehicle work. This branch adds a playable beige compact-car prototype, keeps the existing passenger auto and synthesized audio, and reserves disabled pickup/bus slots. The four requested reference images were unavailable, so no exact-reference or completed-four-vehicle claim is made. Production main remains the reviewed district version until the vehicle stage is ready.

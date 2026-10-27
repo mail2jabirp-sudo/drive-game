@@ -1,0 +1,30 @@
+# Vehicle foundation — draft, reference images missing
+
+The user requests four specific reference-matched vehicles in this order: beige Maruti800, yellow auto pickup, red/cream KSRTC Fast Passenger, black/yellow passenger autorickshaw. **None of the four reference images is attached to this task or present in the workspace.** Attachment inventory contains only the earlier OSM parts and pasted text. No image has been treated as a model, downloaded without a licence or claimed as inspected.
+
+This checkpoint follows the requested first-vehicle gate. It prepares an extensible shared system and a **playable Maruti800-inspired prototype from the written description**, while preserving the existing passenger auto. It is not an exact reference match, a completed four-vehicle delivery or approval to replace production. The pickup and bus slots are disabled and clearly marked pending. Obtain the actual four images in numerical order before verifying the first model and implementing the subsequent reference vehicles.
+
+## Actually working in this draft
+
+- A custom cream/beige narrow hatchback with short bonnet, sloping windshield/rear hatch, roof/pillars/windows, door handles, mirrors, bumpers, lamps, arches, four rotating wheels, animated front steering pivots, dashboard, steering wheel, front seats/rear bench and simple right-hand driver. Proportions use an approximate3.34×1.44m body and2.175m wheelbase. It remains a low-poly approximation, not an accurate licensed manufacturer CAD model or photorealistic asset.
+- Separate car acceleration, braking, reverse, wheelbase, steering response, resistance and speed cap; mass650kg versus the original auto's360kg is tuning metadata, not a rigid-body simulation. Car maximum32m/s, auto22m/s are game tuning, not certified performance. Original auto parameters remain the defaults, including14m/s² reverse braking via throttle. Car corner/axle samples help prevent nose/body wall penetration, with existing source-road/building collision rules retained.
+- Authored sprung-body bob/pitch/roll, rotating wheels and steering. This is visual suspension response on the existing flat map, not measured suspension travel, road bumps or a terrain solver.
+- Headlight illumination via one non-shadowed spotlight plus lamp emission; brake/tail lamps and left/right/hazard emission. Controls are in Display settings. These update for both existing auto and new car; none is claimed matched to missing photographs.
+- Vehicle controls on welcome and in Display settings, in the required reference order. Only the implemented car and existing passenger auto are selectable. Changing requires stopping and a clear footprint. An active passenger must be delivered before changing to the free-driving car, preserving the fare, wallet and original pose.
+- Car free driving in the same unified Malappuram District. No world selector or alternate map is added. Passenger auto fares, tea, wallet, steering/braking, camera, mobile controls and map assets remain intact. Selected vehicle is stored as an additive field in the existing atomic save; old saves default to the original auto and retain all archived fields. Muting and volume have a separate optional preference key.
+
+## Audio provenance and actual scope
+
+**All sounds are original Web Audio synthesis under the repository's MIT code licence. They are synthesized placeholders, not authentic recordings of a Maruti, Bajaj, KSRTC bus or any real vehicle. No external sound files are used.** Generated deterministic noise, oscillator waveforms and envelopes have no third-party recording rights dependency.
+
+Car and passenger auto have different idle/RPM/filter/horn profiles. Throttle, speed and automatic gear selection drive smooth engine pitch/load envelopes. Ignition/start, gear-change, braking and indicator clicks are synthesized cues. Original mission-success chimes remain. The car uses a higher-pitched two-tone horn; the auto retains its two-tone synthesized horn character.
+
+Audio is initialized/resumed after a user gesture. One shared AudioContext and one two-oscillator engine voice survive switching, with a maximum of six short transient sources. The noise buffer is reused; completed transients disconnect. Spatial HRTF/inverse-distance attenuation uses the player's vehicle position relative to the chase camera and listener orientation. There is no AI fleet audio or Doppler implementation yet. Engine/master changes fade; volume and mute affect the complete graph. Browser tests measure actual signal RMS, engine frequency and voice counts; this does not establish acoustic realism or replace listening on target devices.
+
+Not implemented: pickup/cargo model, cargo missions/rattle, bus model, diesel/air brakes/doors/tickets/bus stops, AI traffic vehicles, authentic recordings, real engine transmission/weight/suspension physics, reference image matching, vehicle LOD/instancing for traffic or full seating/cargo capacity simulation. Existing traffic fines and signal simulation were not present in the prior game and are not claimed here.
+
+## Validation and next gate
+
+Run production build, unit, browser and production suites as documented in README. New checks cover car geometry/wheel animation and footprint collision, distinct dynamics, safe save fields, model switching/active-passenger protection, real audio output/mute/volume/voice limits, lights, selection reload and mobile driving. Existing geographic and passenger regressions remain enabled.
+
+Before release: obtain the missing four reference images, verify/refine first-car silhouette/colours/details against image1, inspect vehicle sounds on speakers/headphones and actual laptop/mobile performance, then add the pickup, bus and reference4 auto refinements incrementally using the shared system. Keep the draft unmerged until its intended stage is reviewable against supplied references. Vercel preview status is not hosted gameplay verification; that remains subject to the existing cloud-host network restriction.
