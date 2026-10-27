@@ -1,0 +1,18 @@
+© OpenStreetMap contributors
+https://www.openstreetmap.org/copyright
+
+This adapted road database is distributed under the Open Database License (ODbL) 1.0:
+https://opendatacommons.org/licenses/odbl/1-0/
+
+Source: export.osm reconstructed by exact binary concatenation of user-provided
+export.osm.part01, export.osm.part02, export.osm.part03, in that order.
+SHA-256: 7915b6d48899723c3dd4a88dfd8c3db64d77e0e85e60d9e99511c2bb6b7ac3f2
+
+The full reconstructed source, importer and provenance are distributed in:
+https://github.com/mail2jabirp-sudo/drive-game/tree/codex/en3d-malappuram-roads
+See export.osm, scripts/import_export_roads.py and data/EXPORT_PROVENANCE.json.
+
+The playable database is only an initial 4.8 km road window around a verified
+Malappuram Bypass Road vertex. It is not complete Malappuram district coverage.
+Widths without tags are estimates; elevation, buildings and traffic enforcement
+are not supplied by this road-only integration. Original app/art remain MIT.

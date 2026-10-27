@@ -2,9 +2,13 @@
 
 **Kerala Open World Simulator**
 
-The existing autorickshaw game now has two driving areas: a small **real OSM Kottakkal slice** from the repository's `map.osm`, and the preserved **original fictional practice loop**. Retained roads, connections and footprints use source geographic coordinates at metre scale. Building heights and models remain approximate; this is not photorealistic or surveyed 3D terrain. No paid assets, map API accounts or runtime map-service calls are required.
+The existing autorickshaw game retains its original two driving areas: a small **real OSM Kottakkal slice** from the repository's `map.osm`, and the preserved **original fictional practice loop**. Retained roads, connections and footprints use source geographic coordinates at metre scale. Building heights and models remain approximate; this is not photorealistic or surveyed 3D terrain. No paid assets, map API accounts or runtime map-service calls are required.
 
 New players start in the real-map area. Existing saves return to their original practice ride. Select **Driving area** on the welcome screen, or open **Display → Change driving area** during a ride. Earnings, trips and tea-break counts are shared; each area's passenger and vehicle position are kept separately without erasing the original save.
+
+## Uploaded Malappuram road mode
+
+A third area, **Malappuram · uploaded road tiles**, integrates a verified 4.8km window from the reconstructed `export.osm`. Choose it on welcome or via Display → Change driving area. It streams a bounded 3×3 window of small road files, preserving both earlier maps and every ride save. The full source spans a broader Malappuram-region road extract, not verified whole-district coverage. See [ROAD_EXPORT.md](ROAD_EXPORT.md) for exact bounds, roads, reconstruction hashes, streaming limits and merge instructions. Buildings are deferred in this road-only mode.
 
 ## Develop
 
@@ -26,7 +30,7 @@ npm run map:check   # source checksum agrees with the generated excerpt
 npm run map:import  # intentionally regenerate after changing the source/config
 ```
 
-Browser checks use Playwright and an installed Chromium at `/usr/bin/chromium`. Set `CHROMIUM_PATH` if yours is elsewhere. Browser tests include keyboard/touch input, pickup, delivery and saved-state restoration. They exercise both areas and deliberately seed saved destination positions to test delivery without a lengthy automated road trip. Graph tests separately verify a connected, returnable route and traversable source segments. Unit tests exercise driving and the mission rules separately. The application does not depend on Playwright at runtime.
+Browser checks use Playwright and an installed Chromium at `/usr/bin/chromium`. Set `CHROMIUM_PATH` if yours is elsewhere. Browser tests include keyboard/touch input, pickup, delivery and saved-state restoration. They exercise all three areas and deliberately seed saved destination positions to test delivery without a lengthy automated road trip. Graph tests separately verify a connected, returnable route and traversable source segments. Unit tests exercise driving and the mission rules separately. The application does not depend on Playwright at runtime.
 
 ## Drive
 
