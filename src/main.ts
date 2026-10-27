@@ -8,6 +8,7 @@ import { createRickshaw } from './vehicle';
 import { createStreamedRoadWorld } from './streamed-world';
 import { createOsmWorld } from './osm-world';
 import type { OsmMap } from './osm-types';
+import {roadSpawn} from './road-spawn';
 import { nearestRoad } from './osm-navigation';
 import { WORLD_KEY, readOsmRide, serializeRouteProgress } from './route-save';
 import { advanceCar, blocked, onRoad } from './driving';
@@ -15,7 +16,10 @@ import type { DriveState } from './driving';
 import { Input } from './input';
 import { GameAudio } from './audio';
 import {createTraffic} from './traffic';
-import {readDensity} from './traffic-types';
+import {readDensity,signalPhase,signalCountdown} from './traffic-types';
+import {RoadNavigator,turnGuidance} from './gps';
+import type {NavigationRoute} from './gps';
+import {createGpsRenderer,navigationIcon} from './gps-renderer';
 import { buyTea, TEA_PRICE, TEA_STOP } from './tea';
 import { FARE, SAVE_KEY, newProgress, parseProgress, interactMission } from './progress';
 
@@ -31,6 +35,7 @@ const practicePose = {x:progress.x, z:progress.z, heading:progress.heading, phas
 let osmRide = readOsmRide(rawSave);
 let exportRide = readOsmRide(rawSave,'exportRide');
 let mapId: string | null = null;
+let missionOrigin: {x:number;z:number}|undefined;
 // Legacy URLs and area preferences all enter the same geographic district world.
 let previousWorld: string|null=null;
 try {previousWorld=localStorage.getItem(WORLD_KEY);localStorage.setItem(WORLD_KEY,'malappuram');}catch{/* Optional preference only. */}
@@ -55,7 +60,7 @@ function toast(message: string): void {
   toastTimer = window.setTimeout(() => element('toast').classList.remove('visible'), 4000);
 }
 function save(): void {
-  if (isExport && mapId) exportRide = {version:1,mapId,x:car.x,z:car.z,heading:car.heading,phase:progress.phase};
+  if (isExport && mapId) exportRide = {version:1,mapId,missionOrigin,x:car.x,z:car.z,heading:car.heading,phase:progress.phase};
   else if (isReal && mapId) osmRide = {version:1, mapId, x:car.x, z:car.z, heading:car.heading, phase:progress.phase};
   else { progress.x = car.x; progress.z = car.z; progress.heading = car.heading; }
   try {
@@ -97,6 +102,7 @@ try {
   if (isExport) {
     element('loading').textContent = 'Loading nearby roads…';
     streamed = await createStreamedRoadWorld(scene, exportRide ?? undefined, osmRide ?? undefined, previousWorld);
+    missionOrigin=streamed.missionOrigin;
     mapData = streamed.data; mapId = mapData.source.sha256;
   } else if (isReal) {
     element('loading').textContent = 'Loading Kottakkal roads from your map.osm…';
@@ -134,9 +140,8 @@ try {
   document.querySelector('.map-heading > span')!.textContent = SIMULATOR_SUBTITLE;
   const rickshaw = createRickshaw();
   scene.add(rickshaw.group);
-  if (surface.isBlocked(car.x, car.z)) {
-    car.x = spawn.x; car.z = spawn.z; car.heading = spawn.heading;
-  }
+  if(mapData)Object.assign(car,roadSpawn(mapData,surface,car));
+  else if(surface.isBlocked(car.x,car.z))Object.assign(car,spawn);
 
   const traffic=mapData&&realWorld?await createTraffic(scene,mapData,realWorld):null;
   const trafficSelect=element<HTMLSelectElement>('traffic-density');trafficSelect.value=traffic?.sim.density??'medium';
@@ -169,17 +174,58 @@ try {
   head.position.set(-0.35, 1.78, 0.84);
   passenger.add(shirt, head); rickshaw.group.add(passenger);
   const waitingPassenger = new THREE.Group();
+  let waitingPassengerValid=false;
   if (realWorld) {
     const body = new THREE.Mesh(new THREE.BoxGeometry(0.5,0.65,0.3), shirt.material); body.position.y = 1.15;
     const face = new THREE.Mesh(new THREE.SphereGeometry(0.18,10,8), head.material); face.position.y = 1.68;
     const trousers = new THREE.MeshStandardMaterial({color:'#374638'});
     for (const x of [-0.14,0.14]) {const leg = new THREE.Mesh(new THREE.BoxGeometry(0.17,0.7,0.22),trousers);leg.position.set(x,0.48,0);waitingPassenger.add(leg);}
     waitingPassenger.add(body,face);
-    waitingPassenger.position.set(pickup.x-Math.cos(spawn.heading)*3,0,pickup.z+Math.sin(spawn.heading)*3);
-    waitingPassenger.position.y=groundHeight(waitingPassenger.position.x,waitingPassenger.position.z);
-    scene.add(waitingPassenger);
+    placeWaitingPassenger();
+    waitingPassenger.name='Passenger at validated roadside pickup';scene.add(waitingPassenger);
   }
+  function placeWaitingPassenger(){
+    waitingPassengerValid=false;if(!realWorld)return;
+    const match=mapData?nearestRoad(mapData.roads,pickup):null;
+    if(match){
+      for(const side of [1,-1])for(const extra of [1.2,2.2,3.2]){
+        if(waitingPassengerValid)break;
+        const offset=(match.road.width/2+extra)*side,x=match.point.x-Math.cos(match.heading)*offset,z=match.point.z+Math.sin(match.heading)*offset;
+        if(!realWorld.roadSurface(x,z)&&!realWorld.isBlocked(x,z)){waitingPassenger.position.set(x,groundHeight(x,z),z);waitingPassengerValid=true;}
+      }
+    }
+    // At a junction both perpendicular shoulders can still be pavement. Search
+    // the nearby verge rather than putting the waiting person in live traffic.
+    for(const radius of [3.5,5,7,9])for(let i=0;i<16&&!waitingPassengerValid;i++){
+      const angle=i*Math.PI/8,x=pickup.x+Math.cos(angle)*radius,z=pickup.z+Math.sin(angle)*radius;
+      if(!realWorld.roadSurface(x,z)&&!realWorld.isBlocked(x,z)){waitingPassenger.position.set(x,groundHeight(x,z),z);waitingPassengerValid=true;}
+    }
+  }
+  let waitingPassengerRoads=mapData?.roads;
   const target = () => progress.phase === 'pickup' ? pickup : dropoff;
+  const navigator=new RoadNavigator(),gpsRenderer=createGpsRenderer(scene,groundHeight);
+  let navRoute:NavigationRoute={points:[],distance:0,offRoad:false,available:false},navRevision=0;
+  let navFrom={x:Infinity,z:Infinity},navTarget={x:Infinity,z:Infinity},nextNavigation=0;
+  function updateNavigation(){
+    if(!mapData)return;
+    const changed=navigator.setRoads(mapData.roads),destination=target();
+    if(changed||destination.x!==navTarget.x||destination.z!==navTarget.z||elapsed>=nextNavigation&&Math.hypot(car.x-navFrom.x,car.z-navFrom.z)>6){
+      navRoute=navigator.route(car,destination);navRevision++;navFrom={x:car.x,z:car.z};navTarget={...destination};nextNavigation=elapsed+1;gpsRenderer.update(navRoute,car);
+    }
+    const instruction=turnGuidance(navRoute,car);
+    const arrow=element('gps-arrow');if(arrow.dataset.direction!==instruction.arrow){arrow.innerHTML=navigationIcon(instruction.arrow);arrow.dataset.direction=instruction.arrow;}
+    element('gps-instruction').textContent=instruction.text;
+    element('gps-distance').textContent=navRoute.available?`${Math.round(instruction.distance)} m · ${progress.phase==='pickup'?'pickup':'drop-off'}`:'Waiting for connected road coverage';
+    const warning=element('road-warning'),signal=element('signal-status');warning.hidden=true;signal.hidden=true;
+    if(!traffic)return;
+    const ahead=(p:{x:number;z:number},range:number)=>Math.hypot(p.x-car.x,p.z-car.z)<range&&-(p.x-car.x)*Math.sin(car.heading)-(p.z-car.z)*Math.cos(car.heading)>-4;
+    const match=nearestRoad(mapData.roads,car);
+    const control=[...traffic.sim.controls.values()].filter(c=>c.kind==='traffic_signals'&&traffic.sim.nodeEdges.has(c.nodeId)&&match?.road.nodeIds.includes(c.nodeId)&&ahead(c,90)).sort((a,b)=>Math.hypot(a.x-car.x,a.z-car.z)-Math.hypot(b.x-car.x,b.z-car.z))[0];
+    if(control){const phase=signalPhase(traffic.sim.clock,car.heading);signal.hidden=false;signal.dataset.phase=phase;signal.textContent=`Simulated signal · ${phase} · ${signalCountdown(traffic.sim.clock,car.heading)} s`;}
+    if(match?.road.bridge&&match.distance<15){warning.hidden=false;warning.textContent='പാലം · Bridge — keep left';}
+    else if([...traffic.sim.junctions].some(id=>{if(!match?.road.nodeIds.includes(id))return false;const e=traffic.sim.nodeEdges.get(id)!;return ahead(e.from===id?e.a:e.b,40);})){warning.hidden=false;warning.textContent='ജംഗ്ഷൻ · Junction — slow down';}
+    else if(match?.road.points.some((b,i,list)=>{if(!i||i===list.length-1||!ahead(b,35))return false;const a=list[i-1],c=list[i+1],ux=b.x-a.x,uz=b.z-a.z,vx=c.x-b.x,vz=c.z-b.z;return Math.abs(Math.atan2(uz*vx-ux*vz,ux*vx+uz*vz))>.6;})){warning.hidden=false;warning.textContent='വളവ് · Bend — slow down';}
+  }
   const distance = () => Math.hypot(car.x - target().x, car.z - target().z);
 
   const teaDistance = () => tea ? Math.hypot(car.x - tea.x, car.z - tea.z) : Infinity;
@@ -299,9 +345,9 @@ try {
         ctx.strokeStyle = '#faf7e8'; ctx.lineWidth = Math.max(1.2,road.width*viewScale);
         ctx.beginPath(); road.points.forEach((p,i)=> i ? ctx.lineTo(sx(p.x),sz(p.z)) : ctx.moveTo(sx(p.x),sz(p.z))); ctx.stroke();
       }
-      if (realWorld?.mission.route.length) {
-        ctx.strokeStyle = '#c08433'; ctx.lineWidth = 2.8; ctx.beginPath();
-        realWorld.mission.route.forEach((p,i)=> i ? ctx.lineTo(sx(p.x),sz(p.z)) : ctx.moveTo(sx(p.x),sz(p.z))); ctx.stroke();
+      if (navRoute.available&&navRoute.points.length) {
+        ctx.strokeStyle = progress.phase==='pickup'?'#c08433':'#148e7c'; ctx.lineWidth = 3.8; ctx.beginPath();
+        navRoute.points.forEach((p,i)=> i ? ctx.lineTo(sx(p.x),sz(p.z)) : ctx.moveTo(sx(p.x),sz(p.z))); ctx.stroke();
       }
     } else {
       ctx.strokeStyle = '#f9f6e8'; ctx.lineWidth = 16; ctx.lineJoin = 'round';
@@ -312,6 +358,7 @@ try {
       ctx.font = '9px sans-serif'; ctx.fillText('PRACTICE LOOP',w/2,h/2+11);
     }
     if (tea) {ctx.fillStyle = '#c97645'; ctx.beginPath(); ctx.arc(sx(tea.x),sz(tea.z),4,0,Math.PI*2);ctx.fill();}
+    for(const [point,label,color] of [[pickup,'P','#c08433'],[dropoff,'D','#148e7c']] as const){const x=sx(point.x),z=sz(point.z);ctx.fillStyle=color;ctx.beginPath();ctx.arc(x,z,5,0,Math.PI*2);ctx.fill();ctx.font='bold 11px sans-serif';ctx.fillText(label,x+7,z-5);}
     ctx.beginPath(); ctx.arc(sx(target().x), sz(target().z), 6, 0, Math.PI * 2);
     ctx.fillStyle = progress.phase === 'pickup' ? '#e9a52b' : '#198c7c'; ctx.fill();
     ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();
@@ -323,6 +370,8 @@ try {
     ctx.fillStyle = '#687766'; ctx.font = 'bold 10px sans-serif'; ctx.fillText('N ↑', w - 20, 20);
   }
   function updateHud(): void {
+    updateNavigation();
+    if(mapData&&mapData.roads!==waitingPassengerRoads&&Math.hypot(car.x-pickup.x,car.z-pickup.z)<250){placeWaitingPassenger();waitingPassengerRoads=mapData.roads;}
     element('traffic-status').textContent=traffic?.status??'Traffic unavailable';
     element('money').textContent = `₹${progress.money.toLocaleString('en-IN')}`;
     element('trips').textContent = String(progress.trips);
@@ -351,7 +400,7 @@ try {
     element<HTMLButtonElement>('interact-button').disabled = (!nearby && !nearTea) || Math.abs(car.speed) >= 2 || paused;
     element('interact-button').classList.toggle('ready', (nearby || nearTea) && Math.abs(car.speed) < 2);
     document.body.classList.toggle('has-passenger', !pickingUp);
-    pickupMarker.visible = pickingUp; dropoffMarker.visible = !pickingUp; passenger.visible = !pickingUp; waitingPassenger.visible = pickingUp;
+    pickupMarker.visible = pickingUp; dropoffMarker.visible = !pickingUp; passenger.visible = !pickingUp; waitingPassenger.visible = pickingUp&&waitingPassengerValid;
     minimap();
   }
   let last: number | undefined;
@@ -409,6 +458,9 @@ try {
     landscape.update(camera.position);
     sun.position.set(car.x - 45, carHeight()+70, car.z + 25);
     sun.target.position.set(car.x, carHeight(), car.z);
+    // Keep the nearby road view clear; the ground ring and passenger still mark the stop.
+    pickupMarker.children[2].visible=Math.hypot(car.x-pickup.x,car.z-pickup.z)>12;
+    dropoffMarker.children[2].visible=Math.hypot(car.x-dropoff.x,car.z-dropoff.z)>12;
     pickupMarker.children[2].position.y = dropoffMarker.children[2].position.y = 5 + Math.sin(elapsed * 2) * 0.3;
     desiredCamera.set(car.x + Math.sin(car.heading) * (10 + Math.abs(car.speed) * 0.07), carHeight()+6.4 + Math.abs(car.speed) * 0.04, car.z + Math.cos(car.heading) * (10 + Math.abs(car.speed) * 0.07));
     cameraRay.origin.set(car.x, carHeight()+1.5, car.z);

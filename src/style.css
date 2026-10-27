@@ -49,3 +49,8 @@ button:focus-visible,a:focus-visible,summary:focus-visible,select:focus-visible{
 .map-heading>span:first-child{min-width:0;max-width:calc(100% - 20px);letter-spacing:.15px;line-height:1.4}
 
 .display-popover{max-height:70vh;overflow:auto}.display-popover button{font:inherit;padding:6px;min-height:30px}.display-popover input{max-width:100%}#traffic-status{font-size:10px;line-height:1.4}
+
+.gps-guide{display:flex;align-items:center;gap:10px;padding:9px 0;margin:0 0 8px;border-top:1px solid #173b3120;border-bottom:1px solid #173b3120}.gps-guide>strong{font-size:28px;line-height:1;color:#148e7c}.gps-guide span{display:block;font-size:11px;line-height:1.3}.gps-guide small{display:block;margin-top:3px;color:#687766;font-size:10px}.signal-status,.road-warning{font-size:11px;line-height:1.4;margin:4px 0 9px}.signal-status{padding:6px 8px;border-radius:6px;background:#148e7c20}.signal-status[data-phase=red]{background:#b7433720;color:#943b31}.signal-status[data-phase=amber]{background:#bc8d2225;color:#826619}.road-warning{color:#82662f}
+@media(max-width:700px),(max-height:540px){.gps-guide{padding:4px 0;margin-bottom:5px;gap:7px}.gps-guide>strong{font-size:22px}.gps-guide span{font-size:10px}.gps-guide small{font-size:9px}.signal-status,.road-warning{font-size:9px;margin:3px 0}}
+
+.gps-guide>strong{display:flex;align-items:center;justify-content:center;flex:0 0 28px}.gps-guide svg{display:block;width:28px;height:28px}@media(max-width:700px),(max-height:540px){.gps-guide>strong{flex-basis:22px}.gps-guide svg{width:22px;height:22px}}

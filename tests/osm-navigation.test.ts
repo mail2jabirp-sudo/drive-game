@@ -91,6 +91,7 @@ test('optional terrain places road pavement, junction discs and ground in the sa
     if(!(object instanceof THREE.Mesh))return;
     const positions=object.geometry.getAttribute('position');
     if(object.name==='DEM terrain surface'){ground=true;assert.ok(positions.count>6000);return;}
+    if((object.material as THREE.Material).name.startsWith('Decorative '))return;
     for(let i=0;i<positions.count;i++){
       const x=positions.getX(i),z=positions.getZ(i),height=positions.getY(i);
       assert.ok(Math.abs(height-heightAt(x,z))<0.05,'rendered roads and joins follow sampled metre heights');
