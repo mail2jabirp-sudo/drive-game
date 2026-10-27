@@ -7,7 +7,7 @@ import { nearestRoad, pointInPolygon, segmentDistance, selectMissionStops } from
 import type { Collider } from './world';
 
 /** Render a bounded source-data slice, not a fabricated road network or surveyed building model. */
-export function createOsmWorld(scene: THREE.Scene, data: OsmMap, missionOverride?: ReturnType<typeof selectMissionStops>, terrain?: {heightAt:(x:number,z:number)=>number}): {
+export function createOsmWorld(scene: THREE.Scene, data: OsmMap, missionOverride?: ReturnType<typeof selectMissionStops>, terrain?: {heightAt:(x:number,z:number)=>number}, focus?:MapPoint): {
   colliders: Collider[];
   heightAt:(x:number,z:number)=>number;
   update: (elapsed: number, cameraPosition: THREE.Vector3, lowDetail?: boolean) => void;
@@ -31,6 +31,9 @@ export function createOsmWorld(scene: THREE.Scene, data: OsmMap, missionOverride
   const wall = townMaterial('#c2c8ae'); wall.vertexColors = true;
   const roof = new THREE.MeshStandardMaterial({ color: '#9b9687', roughness: 0.98, vertexColors: true });
   const windows = new THREE.MeshStandardMaterial({ color: '#526963', roughness: 0.42, metalness: 0.1, side: THREE.DoubleSide });
+  const bark=new THREE.MeshStandardMaterial({color:'#77654c',roughness:1});bark.name='Decorative palm trunks';
+  const poleMaterial=new THREE.MeshStandardMaterial({color:'#8d918a',roughness:1});poleMaterial.name='Decorative utility poles';
+  const leaves=new THREE.MeshStandardMaterial({color:'#3e7046',roughness:1,side:THREE.DoubleSide});leaves.name='Decorative palm crowns';
   const roadPaint = new THREE.MeshStandardMaterial({ color: '#d2ccaf', roughness: 1 });
   const waterMaterial = new THREE.MeshStandardMaterial({ color: '#708e85', roughness: 0.35, metalness: 0.1, side: THREE.DoubleSide });
   const centerX=(data.bounds.minX+data.bounds.maxX)/2,centerZ=(data.bounds.minZ+data.bounds.maxZ)/2;
@@ -117,7 +120,14 @@ export function createOsmWorld(scene: THREE.Scene, data: OsmMap, missionOverride
       addGeometry(lineQuad(piece.a,piece.b,road.width,y),roadMaterial,middlePiece);
     }
     const join=(p:MapPoint)=>{
-      const disc=new THREE.CircleGeometry(road.width/2,12);disc.rotateX(-Math.PI/2);disc.translate(p.x,y,p.z);
+      // Round only the rendered pavement buffer: source centre lines and node IDs
+      // stay exact. Matching verge joins prevent sharp shoulder holes at bends.
+      if(['trunk','primary','secondary','tertiary'].includes(road.highway)){
+        const verge=new THREE.CircleGeometry((road.width+1.2)/2,24);verge.rotateX(-Math.PI/2);verge.translate(p.x,y-.009,p.z);
+        if(terrain){const v=verge.getAttribute('position');for(let j=0;j<v.count;j++)v.setY(j,y-.009+heightAt(v.getX(j),v.getZ(j)));verge.computeVertexNormals();}
+        addGeometry(verge,shoulder,p);
+      }
+      const disc=new THREE.CircleGeometry(road.width/2,24);disc.rotateX(-Math.PI/2);disc.translate(p.x,y,p.z);
       if(terrain){const positions=disc.getAttribute('position');for(let i=0;i<positions.count;i++)positions.setY(i,y+heightAt(positions.getX(i),positions.getZ(i)));disc.computeVertexNormals();}
       addGeometry(disc,roadMaterial,p);
     };
@@ -181,6 +191,40 @@ export function createOsmWorld(scene: THREE.Scene, data: OsmMap, missionOverride
     if (water.kind === 'area' && water.points.length >= 3) addGeometry(flatShape(water.points, 0.012), waterMaterial, middle);
     else for (let i = 1; i < water.points.length; i++) addGeometry(lineQuad(water.points[i - 1], water.points[i], 2, 0.012), waterMaterial, middle);
   }
+  // Decorative Kerala roadside planting, not surveyed tree positions or new land-use data.
+  // Shared batches inherit source chunk culling/disposal and never occupy mapped pavement,
+  // footprints or water. Limit density independently of the source extract's size.
+  let treeCount=0;const planted:MapPoint[]=[];
+  const plantingCenter=focus??missionOverride?.spawn??{x:0,z:0};
+  const plantingRoads=data.roads.map(road=>({road,distance:Math.min(...road.points.map(p=>Math.hypot(p.x-plantingCenter.x,p.z-plantingCenter.z)))})).sort((a,b)=>a.distance-b.distance).map(p=>p.road);
+  for(const road of plantingRoads){
+    if(!['primary','secondary','tertiary','residential','unclassified'].includes(road.highway))continue;
+    for(let i=1;i<road.points.length&&treeCount<240;i++){
+      const a=road.points[i-1],b=road.points[i],dx=b.x-a.x,dz=b.z-a.z,len=Math.hypot(dx,dz);if(len<12)continue;
+      const hash=[...road.sourceWayId].reduce((h,c)=>h*31+c.charCodeAt(0),7)>>>0;
+      for(let d=8+(hash%13);d<len&&treeCount<240;d+=38){
+        const side=(i+Math.floor(d/38)+hash)%2?1:-1,offset=road.width/2+5+(hash%4);
+        const p={x:a.x+dx*d/len-dz/len*offset*side,z:a.z+dz*d/len+dx/len*offset*side};
+        if(p.x<data.bounds.minX||p.x>data.bounds.maxX||p.z<data.bounds.minZ||p.z>data.bounds.maxZ||isBlocked(p.x,p.z,3)||nearestRoad(data.roads,p)!.distance<5||planted.some(q=>Math.hypot(p.x-q.x,p.z-q.z)<18))continue;
+        if(data.water.some(w=>w.kind==='area'?pointInPolygon(p,w.points):w.points.some((q,j)=>j>0&&segmentDistance(p,w.points[j-1],q).distance<7)))continue;
+        planted.push(p);treeCount++;
+        if(treeCount%5===0){
+          const base=heightAt(p.x,p.z),pole=new THREE.CylinderGeometry(.12,.18,6,5);pole.translate(p.x,base+3,p.z);addGeometry(pole,poleMaterial,p);
+          const arm=new THREE.BoxGeometry(1.7,.12,.13);arm.translate(p.x,base+5.5,p.z);addGeometry(arm,poleMaterial,p);continue;
+        }
+        const h=5.5+(hash%4)*.6,base=heightAt(p.x,p.z);
+        const trunk=new THREE.CylinderGeometry(.13,.23,h,5);trunk.translate(p.x,base+h/2,p.z);addGeometry(trunk,bark,p);
+        const positions:number[]=[];
+        for(let n=0;n<7;n++){
+          const angle=n*Math.PI*2/7+hash,ux=Math.cos(angle),uz=Math.sin(angle),vx=-uz,vz=ux;
+          const tip={x:p.x+ux*3.8,z:p.z+uz*3.8},mid={x:p.x+ux*1.8,z:p.z+uz*1.8};
+          positions.push(p.x,base+h,p.z,mid.x+vx*.55,base+h+.3,mid.z+vz*.55,tip.x,base+h-1.2,tip.z,
+            p.x,base+h,p.z,tip.x,base+h-1.2,tip.z,mid.x-vx*.55,base+h+.3,mid.z-vz*.55);
+        }
+        const crown=new THREE.BufferGeometry();crown.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));crown.computeVertexNormals();addGeometry(crown,leaves,p);
+      }
+    }
+  }
   for (const chunk of chunks.values()) for (const batch of chunk.batches.values()) {
     const geometry = mergeGeometries(batch.geometries, false);
     if (!geometry) throw new Error('Unable to combine OSM geometry.');
@@ -198,6 +242,7 @@ export function createOsmWorld(scene: THREE.Scene, data: OsmMap, missionOverride
     ctx.font = '18px sans-serif'; ctx.fillText('OSM location · approximate model', 320, 91, 610);
     const texture = new THREE.CanvasTexture(canvas); texture.colorSpace = THREE.SRGBColorSpace;
     const label = new THREE.Mesh(new THREE.PlaneGeometry(8, 1.6), new THREE.MeshBasicMaterial({ map: texture, side: THREE.DoubleSide }));
+    label.name=`OSM landmark label ${landmark.id}`;
     const building = data.buildings.find(b => pointInPolygon(landmark, b.points));
     label.position.set(landmark.x, building ? Math.min(building.height, 40) + 1.6 : 3.4, landmark.z);
     chunkAt(landmark.x, landmark.z).group.add(label); signs.push(label);
@@ -213,7 +258,12 @@ export function createOsmWorld(scene: THREE.Scene, data: OsmMap, missionOverride
         chunk.group.visible = distance < (lowDetail ? 220 : 330) + chunk.radius;
         for (const detail of chunk.detail) detail.visible = !lowDetail && distance < 205;
       }
-      for (const sign of signs) sign.lookAt(cameraPosition.x, sign.position.y, cameraPosition.z);
+      for (const sign of signs){
+        const distance=Math.hypot(cameraPosition.x-sign.position.x,cameraPosition.z-sign.position.z);
+        // Map labels are UI annotations, not giant physical billboards in the lane.
+        sign.visible=distance>12&&distance<200;sign.scale.setScalar(Math.min(1,distance/45));
+        sign.lookAt(cameraPosition.x,sign.position.y,cameraPosition.z);
+      }
     },
     dispose() {
       root.removeFromParent();

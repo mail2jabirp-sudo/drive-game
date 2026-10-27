@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import type { MapPoint, OsmMap } from './osm-types';
 import { createOsmWorld } from './osm-world';
+import {roadSpawn} from './road-spawn';
 import {districtRide} from './route-save';
 import type {OsmRide} from './route-save';
 import { selectMissionStops } from './osm-navigation';
@@ -28,13 +29,15 @@ export async function createStreamedRoadWorld(scene:THREE.Scene, saved?:OsmRide,
     terrain={heightAt:elevationSampler(grid)};terrainSource=grid.source;
   }
   const store=new RoadTileStore(manifest);
-  await store.load({x:0,z:0});
+  // Existing saves retain their original mission region; new rides start among verified footprints.
+  const origin=restore?(restore.missionOrigin&&nearbyTileKeys(manifest,restore.missionOrigin).length?restore.missionOrigin:{x:0,z:0}):(manifest.places?.find(p=>p.name==='Kottakkal')??{x:0,z:0});
+  await store.load(origin);
   const data:OsmMap={version:1,source:manifest.source,projection:manifest.projection,bounds:manifest.bounds,...store.features(),intersections:[],stats:manifest.stats};
   const fixed=selectMissionStops(data);
-  fixed.pickupName='Malappuram-area mapped road stop';fixed.dropoffName='Connected mapped road stop';
   if(restore && restore.x>manifest.bounds.minX&&restore.x<manifest.bounds.maxX&&restore.z>manifest.bounds.minZ&&restore.z<manifest.bounds.maxZ){if(nearbyTileKeys(manifest,restore).length)await store.load(restore);Object.assign(data,store.features());}
-  let active=createOsmWorld(scene,data,fixed,terrain);
-  let loadedKey=store.key(restore && store.hasPosition(restore.x,restore.z)?restore:{x:0,z:0});
+  let active=createOsmWorld(scene,data,fixed,terrain,restore??origin);
+  const spawn=roadSpawn(data,active,restore??fixed.spawn);
+  let loadedKey=store.key(restore && store.hasPosition(restore.x,restore.z)?restore:origin);
   let loading=false;let error='';let retryAt=0;let disposed=false;
   async function refresh(point:MapPoint) {
     const key=store.key(point);
@@ -45,7 +48,7 @@ export async function createStreamedRoadWorld(scene:THREE.Scene, saved?:OsmRide,
       if(disposed)return;
       Object.assign(data,store.features());
       // Build next geometry before removing the previous window.
-      const next=createOsmWorld(scene,data,fixed,terrain);active.dispose();active=next;
+      const next=createOsmWorld(scene,data,fixed,terrain,point);active.dispose();active=next;
       loadedKey=key;error='';
     }catch(reason){error='Road download failed · retained nearby roads';retryAt=Date.now()+3000;console.warn(reason);}
     finally{loading=false;}
@@ -53,7 +56,7 @@ export async function createStreamedRoadWorld(scene:THREE.Scene, saved?:OsmRide,
   const world={
     get colliders(){return active.colliders;},
     get chunkCount(){return active.chunkCount;},
-    spawn:fixed.spawn,pickup:fixed.pickup,dropoff:fixed.dropoff,tea:manifest.teaStop??null,
+    spawn,pickup:fixed.pickup,dropoff:fixed.dropoff,tea:manifest.teaStop??null,
     mission:{pickupName:fixed.pickupName,dropoffName:fixed.dropoffName,route:fixed.route},
     heightAt:(x:number,z:number)=>active.heightAt(x,z),
     roadSurface:(x:number,z:number)=>active.roadSurface(x,z),
@@ -63,5 +66,5 @@ export async function createStreamedRoadWorld(scene:THREE.Scene, saved?:OsmRide,
     get streaming(){return {resident:store.resident.size,total:Object.keys(manifest.tiles).length,loading,error,keys:[...store.resident.keys()]};},
     refresh,
   };
-  return {world,data,manifest,terrainSource,restoredRide:restore};
+  return {world,data,manifest,terrainSource,restoredRide:restore,missionOrigin:{x:origin.x,z:origin.z}};
 }

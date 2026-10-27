@@ -78,14 +78,20 @@ export class TrafficSimulation{
  }
  private spawn(player:PlayerPose){
   if(!this.candidates.length)return;
-  const local=this.candidates.filter(e=>{const p=lanePosition(e,e.length/2,this.junctions),d=Math.hypot(p.x-player.x,p.z-player.z);return d>=48&&d<=215;});
+  const local=this.candidates.filter(e=>{const p=lanePosition(e,e.length/2,this.junctions),d=Math.hypot(p.x-player.x,p.z-player.z);return d>=18&&d<=180;});
+  // Seed the first nearby vehicles in the actual forward view, without moving roads
+  // or bypassing footprint, junction, lane and following-distance checks.
+  local.sort((a,b)=>{
+   const score=(e:TrafficEdge)=>{const p=lanePosition(e,e.length/2,this.junctions),dx=p.x-player.x,dz=p.z-player.z,d=Math.hypot(dx,dz),forward=-Math.sin(player.heading)*dx-Math.cos(player.heading)*dz,lateral=Math.abs(Math.cos(player.heading)*dx-Math.sin(player.heading)*dz);return d+Math.max(0,20-forward)*8+lateral*3;};
+   return score(a)-score(b)||a.id.localeCompare(b.id);
+  });
   if(!local.length)return;
   const order:TrafficKind[]=['bike','car','auto','van','bus','lorry','scooter','pickup'];
   // First fill missing suitable categories, then use context/hour weights for extra traffic.
   const priorities:Array<TrafficKind|null>=[...order.filter(k=>!this.agents.some(a=>a.kind===k)),null];
   for(const wanted of priorities)for(let attempt=0;attempt<local.length;attempt++){
-   const edge=local[(this.cursor++)%local.length],middle=lanePosition(edge,edge.length/2,this.junctions),distance=Math.hypot(middle.x-player.x,middle.z-player.z);
-   if(distance<48||distance>215)continue;
+   const edge=local[attempt];this.cursor++;const middle=lanePosition(edge,edge.length/2,this.junctions),distance=Math.hypot(middle.x-player.x,middle.z-player.z);
+   if(distance<18||distance>180)continue;
    const major=['trunk','primary','secondary','tertiary'].includes(edge.road.highway),night=this.hour<6||this.hour>=19;
    const choices=kinds.filter(k=>eligible(k,edge.road)&&edge.length>1&&this.agents.filter(a=>a.kind===k).length<Math.max(2,Math.ceil(this.capacity/3)));
    if(!choices.length||(wanted&&!choices.includes(wanted)))continue;

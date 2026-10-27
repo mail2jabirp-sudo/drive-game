@@ -19,3 +19,10 @@ export interface TrafficAgent extends MapPoint {id:number;y?:number;kind:Traffic
 export function readDensity(value:string|null):Density{return value==='low'||value==='high'?value:'medium';}
 export function signalPhase(time:number,heading:number):'green'|'amber'|'red'{const phase=((time%32)+32)%32,ns=Math.abs(Math.cos(heading))>=Math.abs(Math.sin(heading));return ns?(phase<12?'green':phase<14?'amber':'red'):(phase>=16&&phase<28?'green':phase>=28&&phase<30?'amber':'red');}
 export function eligible(kind:TrafficKind,road:OsmRoad){return road.width>=TRAFFIC[kind].minWidth&&(!TRAFFIC[kind].majorOnly||['trunk','primary','secondary','tertiary','trunk_link','primary_link'].includes(road.highway));}
+
+/** Seconds to the next transition in the same authored phase model used by AI and lamps. */
+export function signalCountdown(time:number,heading:number):number {
+ const phase=signalPhase(time,heading);
+ for(let n=1;n<=32;n++){const next=Math.floor(time)+n;if(signalPhase(next+1e-6,heading)!==phase)return Math.max(1,Math.ceil(next-time));}
+ return 1;
+}
