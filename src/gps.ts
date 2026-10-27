@@ -33,7 +33,7 @@ export class RoadNavigator {
 }
 export function turnGuidance(route:NavigationRoute,player:MapPoint & {heading?:number}):{arrow:string;text:string;distance:number} {
  if(!route.available)return {arrow:'⋯',text:'Destination outside connected loaded roads',distance:0};
- if(route.offRoad)return {arrow:'↥',text:'Return to the mapped road',distance:0};
+ if(route.offRoad)return {arrow:'↥',text:'Enter the mapped road at the ring',distance:route.points.length?Math.hypot(player.x-route.points[0].x,player.z-route.points[0].z):0};
  if(player.heading!==undefined&&route.points.length>1){
   const [a,b]=route.points,heading=Math.atan2(-(b.x-a.x),-(b.z-a.z)),difference=Math.atan2(Math.sin(heading-player.heading),Math.cos(heading-player.heading));
   if(Math.abs(difference)>2.2)return {arrow:'↶',text:'Make a safe U-turn',distance:0};

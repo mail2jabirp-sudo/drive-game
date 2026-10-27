@@ -86,7 +86,7 @@
           <div class="mission-route" aria-hidden="true"><span class="route-dot active"></span><span>Bakery</span><span class="route-line"></span><span class="route-dot"></span><span>Town market</span></div>
         </section>
 
-        <div class="speed-panel" aria-label="Speedometer"><span class="speed-label">PASSENGER AUTO</span><div><strong id="speed">0</strong><span>km/h</span></div><span class="speed-road"><b id="drive-gear">N</b><span id="vehicle-status">Stationary</span></span></div>
+        <div class="speed-panel" aria-label="Speedometer"><span id="vehicle-label" class="speed-label">PASSENGER AUTO</span><div><strong id="speed">0</strong><span>km/h</span></div><span class="speed-road"><b id="drive-gear">N</b><span id="vehicle-status">Stationary</span></span><button id="vehicle-action" class="vehicle-action">Exit auto · F</button></div>
 
         <div class="desktop-controls" aria-label="Driving controls"><span><kbd>W</kbd> Throttle</span><span><kbd>S</kbd> Brake / reverse</span><span><kbd>A</kbd><kbd>D</kbd> Steer</span><span><kbd>E</kbd> Passenger</span><span><kbd>C</kbd> Camera</span></div>
         <p id="save-status" class="save-status">◈ Saved on this device</p>
@@ -94,7 +94,7 @@
         <div class="touch-controls" aria-label="Touch driving controls">
           <div class="touch-steering"><button data-control="left" class="touch-button steering-button" aria-label="Steer left">←</button><button data-control="right" class="touch-button steering-button" aria-label="Steer right">→</button></div>
           <div class="touch-auxiliary"><button data-control="horn" class="touch-button horn-button" aria-label="Sound horn">♪</button><button data-control="handbrake" class="touch-button handbrake-button" aria-label="Handbrake">P</button></div>
-          <div class="touch-pedals"><button data-control="brake" class="touch-button brake-button" aria-label="Brake or reverse"><span>↓</span><small>BRAKE / REV</small></button><button data-control="throttle" class="touch-button throttle-button" aria-label="Accelerate"><span>↑</span><small>GO</small></button></div>
+          <div class="touch-pedals"><button data-control="brake" class="touch-button brake-button" aria-label="Brake or reverse"><span>↓</span><small id="touch-brake-label">BRAKE / REV</small></button><button data-control="throttle" class="touch-button throttle-button" aria-label="Accelerate"><span>↑</span><small id="touch-throttle-label">GO</small></button></div>
         </div>
       </div>
 
@@ -108,18 +108,18 @@
         <div class="dialog-heading"><div><span class="eyebrow">MAKE IT YOURS</span><h2 id="settings-title">Settings</h2></div><button class="dialog-close" data-close aria-label="Close settings">×</button></div>
         <div class="settings-fields">
           <label for="quality-select">Graphics <small>Auto adapts to sustained slow frames.</small></label><select id="quality-select"><option value="auto">Auto</option><option value="low">Low · battery saver</option><option value="medium">Medium</option><option value="high">High</option></select>
-          <label for="camera-select">Camera</label><select id="camera-select"><option value="chase">Chase camera</option><option value="driver">Driver camera</option></select>
+          <label for="camera-select">Vehicle camera<small>Walking uses third person. C rotates the walking view.</small></label><select id="camera-select"><option value="chase">Chase camera</option><option value="driver">Driver camera</option></select>
           <label for="traffic-density">Traffic density <small>Low graphics caps nearby vehicles at six.</small></label><select id="traffic-density"><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option></select>
           <label for="audio-volume">Volume <small>Original synthesized vehicle sounds.</small></label><input id="audio-volume" type="range" min="0" max="1" step="0.05" value="0.65" />
         </div>
         <div class="settings-actions"><button id="settings-mute" class="secondary-button">Mute audio</button><button id="clear-traffic" class="secondary-button">Clear nearby traffic</button></div>
-        <p id="render-status" class="settings-status">Auto quality</p><p id="traffic-status" class="settings-status" role="status">Loading nearby traffic…</p><p id="stream-status" class="settings-status" hidden></p>
+        <p class="settings-status">Passenger fares currently use a flat ₹120 game fare, not the official Kerala tariff.</p><p id="render-status" class="settings-status">Auto quality</p><p id="traffic-status" class="settings-status" role="status">Loading nearby traffic…</p><p id="stream-status" class="settings-status" hidden></p>
         <button class="start-button dialog-done" data-close>DONE</button>
       </dialog>
       <dialog id="controls-dialog" class="game-dialog" aria-labelledby="controls-title">
         <div class="dialog-heading"><div><span class="eyebrow">FIND YOUR RHYTHM</span><h2 id="controls-title">Driving controls</h2></div><button class="dialog-close" data-close aria-label="Close controls">×</button></div>
-        <dl class="controls-list"><div><dt><kbd>W</kbd> / <kbd>↑</kbd></dt><dd>Accelerate</dd></div><div><dt><kbd>S</kbd> / <kbd>↓</kbd></dt><dd>Brake, then reverse</dd></div><div><dt><kbd>A</kbd> <kbd>D</kbd> / <kbd>←</kbd> <kbd>→</kbd></dt><dd>Steer</dd></div><div><dt><kbd>Space</kbd></dt><dd>Handbrake</dd></div><div><dt><kbd>E</kbd></dt><dd>Pick up / drop off / tea</dd></div><div><dt><kbd>H</kbd></dt><dd>Horn</dd></div><div><dt><kbd>C</kbd></dt><dd>Change camera</dd></div><div><dt><kbd>P</kbd> / <kbd>Esc</kbd></dt><dd>Pause / resume</dd></div><div><dt><kbd>R</kbd></dt><dd>Recover to the road</dd></div></dl>
-        <p class="dialog-note">On touch screens, use the pedals, steering, horn and handbrake on screen. Stop inside the destination ring to help a passenger.</p><button class="start-button dialog-done" data-close>READY</button>
+        <dl class="controls-list"><div><dt><kbd>W</kbd> / <kbd>↑</kbd></dt><dd>Accelerate</dd></div><div><dt><kbd>S</kbd> / <kbd>↓</kbd></dt><dd>Brake, then reverse</dd></div><div><dt><kbd>A</kbd> <kbd>D</kbd> / <kbd>←</kbd> <kbd>→</kbd></dt><dd>Steer</dd></div><div><dt><kbd>Space</kbd></dt><dd>Handbrake</dd></div><div><dt><kbd>E</kbd></dt><dd>Pick up / drop off / tea</dd></div><div><dt><kbd>H</kbd></dt><dd>Horn</dd></div><div><dt><kbd>F</kbd></dt><dd>Exit / enter stopped auto</dd></div><div><dt><kbd>Shift</kbd></dt><dd>Run on foot (touch: hold RUN)</dd></div><div><dt><kbd>C</kbd></dt><dd>Change camera / rotate walking view</dd></div><div><dt><kbd>P</kbd> / <kbd>Esc</kbd></dt><dd>Pause / resume</dd></div><div><dt><kbd>R</kbd></dt><dd>Recover to the road</dd></div></dl>
+        <p class="dialog-note">Map: H hospital, S school/college, B bus stop/stand, T taxi, W place of worship, M market. On touch screens, use the pedals, steering, horn and handbrake on screen. Stop inside the destination ring to help a passenger.</p><button class="start-button dialog-done" data-close>READY</button>
       </dialog>
       <dialog id="vehicles-dialog" class="game-dialog" aria-labelledby="vehicles-title">
         <div class="dialog-heading"><div><span class="eyebrow">YOUR GARAGE</span><h2 id="vehicles-title">Passenger auto</h2></div><button class="dialog-close" data-close aria-label="Close vehicles">×</button></div>

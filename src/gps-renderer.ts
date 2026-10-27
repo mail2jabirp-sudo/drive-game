@@ -5,7 +5,9 @@ export function createGpsRenderer(scene:THREE.Scene,heightAt:(x:number,z:number)
  const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.Float32BufferAttribute([0,.09,-1.2,-.55,.09,.55,.55,.09,.55],3));geometry.computeVertexNormals();
  const material=new THREE.MeshBasicMaterial({color:'#25bba1',side:THREE.DoubleSide,transparent:true,opacity:.75,depthWrite:false});
  const arrows=new THREE.InstancedMesh(geometry,material,64);arrows.name='GPS source-road direction arrows';arrows.frustumCulled=false;arrows.count=0;scene.add(arrows);const dummy=new THREE.Object3D();
- return {update(route:NavigationRoute,player:{x:number;z:number}){
+ const entry=new THREE.Mesh(new THREE.RingGeometry(.65,.9,24),new THREE.MeshBasicMaterial({color:'#80e4ce',side:THREE.DoubleSide}));entry.rotation.x=-Math.PI/2;entry.name='GPS verified road entry';entry.visible=false;scene.add(entry);
+ return {update(route:NavigationRoute,player:{x:number;z:number},showEntry=false){
+  entry.visible=showEntry&&route.available&&route.offRoad&&route.points.length>0;if(entry.visible){const p=route.points[0];entry.position.set(p.x,heightAt(p.x,p.z)+.12,p.z);}
   arrows.count=0;let travelled=0,next=6;
   for(let i=1;i<route.points.length;i++){
    const a=route.points[i-1],b=route.points[i],dx=b.x-a.x,dz=b.z-a.z,len=Math.hypot(dx,dz);if(len<.01)continue;

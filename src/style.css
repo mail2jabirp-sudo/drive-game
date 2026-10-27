@@ -1744,3 +1744,8 @@ kbd {
 .road-warning {
   margin: 0 0 5px;
 }
+
+.vehicle-action{margin-top:10px;width:100%;padding:8px 5px;border:1px solid var(--line);border-radius:6px;background:#c6d6bd18;color:var(--accent);font-size:10px}.on-foot .touch-auxiliary .handbrake-button{background:#a7ba87dd;color:#173526}.on-foot .speed-label{color:var(--accent)}
+@media(max-width:700px),(max-height:540px){.vehicle-action{font-size:8px;padding:6px 3px;margin-top:7px}}
+
+.on-foot .touch-auxiliary .handbrake-button{font-size:10px;letter-spacing:.2px}

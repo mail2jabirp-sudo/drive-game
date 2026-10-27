@@ -87,3 +87,12 @@ for (const mode of ['', '?world=osm', '?world=practice', '?world=malappuram'] as
     expect(failedAssets).toEqual([]);
   });
 }
+
+test('compiled on-foot controls exit, walk and re-enter without changing wallet or losing the ride',async({page})=>{
+ const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));await page.goto('/');await expect(page.locator('#start-button')).toBeEnabled();await page.locator('#start-button').click();
+ await page.keyboard.press('KeyF');await expect(page.locator('#vehicle-label')).toHaveText('ON FOOT');await expect(page.locator('#vehicle-action')).toBeEnabled();
+ await page.keyboard.down('KeyW');await expect.poll(async()=>Number(await page.locator('#speed').textContent())).toBeGreaterThan(3);await page.keyboard.up('KeyW');
+ await page.keyboard.press('KeyF');await expect(page.locator('#vehicle-label')).toHaveText('PASSENGER AUTO');await expect(page.locator('#money')).toHaveText('₹0');
+ await page.reload();await expect(page.locator('#continue-button')).toBeEnabled();await page.locator('#continue-button').click();await expect(page.locator('#vehicle-label')).toHaveText('PASSENGER AUTO');await expect(page.locator('#money')).toHaveText('₹0');
+ expect(errors).toEqual([]);await page.screenshot({path:'test-results/production/on-foot-returned.png'});
+});
