@@ -14,6 +14,8 @@ import { advanceCar, blocked, onRoad } from './driving';
 import type { DriveState } from './driving';
 import { Input } from './input';
 import { GameAudio } from './audio';
+import {createTraffic} from './traffic';
+import {readDensity} from './traffic-types';
 import { buyTea, TEA_PRICE, TEA_STOP } from './tea';
 import { FARE, SAVE_KEY, newProgress, parseProgress, interactMission } from './progress';
 
@@ -136,6 +138,16 @@ try {
     car.x = spawn.x; car.z = spawn.z; car.heading = spawn.heading;
   }
 
+  const traffic=mapData&&realWorld?await createTraffic(scene,mapData,realWorld):null;
+  const trafficSelect=element<HTMLSelectElement>('traffic-density');trafficSelect.value=traffic?.sim.density??'medium';
+  trafficSelect.addEventListener('change',()=>{traffic?.setDensity(readDensity(trafficSelect.value));trafficSelect.blur();});
+  element('clear-traffic').addEventListener('click',()=>{traffic?.clear();toast('Nearby traffic cleared. Your ride and fare are safe.');});
+  const volume=element<HTMLInputElement>('audio-volume');
+  try{const saved=JSON.parse(localStorage.getItem('en3d.audio.v1')??'{}');if(typeof saved.volume==='number'&&Number.isFinite(saved.volume))audio.volume=Math.max(0,Math.min(1,saved.volume));audio.muted=saved.muted===true;}catch{/* Optional audio preferences. */}
+  volume.value=String(audio.volume);
+  const saveAudio=()=>{try{localStorage.setItem('en3d.audio.v1',JSON.stringify({volume:audio.volume,muted:audio.muted}));}catch{/* Optional preference. */}};
+  volume.addEventListener('input',()=>{audio.volume=Math.max(0,Math.min(1,Number(volume.value)));saveAudio();});
+  element('sound-button').textContent=audio.muted?'♩':'♫';element('sound-button').setAttribute('aria-pressed',String(audio.muted));
   function missionMarker(color: number): THREE.Group {
     const group = new THREE.Group();
     const ring = new THREE.Mesh(new THREE.RingGeometry(3.4, 3.65, 48), new THREE.MeshBasicMaterial({ color, side: THREE.DoubleSide, transparent: true, opacity: 0.9 }));
@@ -214,7 +226,7 @@ try {
     element('pause-button').title = paused ? 'Resume game (P)' : 'Pause game (P)';
     element('pause-button').setAttribute('aria-pressed', String(paused));
     document.body.classList.toggle('paused', paused);
-    if (paused) { save(); toast('Paused · press P or Resume to keep driving'); }
+    if (paused) { audio.silence();save(); toast('Paused · press P or Resume to keep driving'); }
     else toast('Enjoy the ride.');
   }
   input = new Input(name => {
@@ -236,7 +248,7 @@ try {
   element('reset-button').addEventListener('click', () => { if (started && !paused) resetCar(); });
   element('pause-button').addEventListener('click', pause);
   element('sound-button').addEventListener('click', () => {
-    audio.start(); audio.muted = !audio.muted;
+    audio.start(); audio.muted = !audio.muted;saveAudio();
     element('sound-button').textContent = audio.muted ? '♩' : '♫';
     element('sound-button').setAttribute('aria-label', audio.muted ? 'Turn sound on' : 'Mute sound');
     element('sound-button').title = audio.muted ? 'Sound off · tap to enable' : 'Sound on · tap to mute';
@@ -250,6 +262,7 @@ try {
   const cameraRay = new THREE.Ray();
   const cameraHit = new THREE.Vector3();
   const desiredCamera = new THREE.Vector3();
+  const audioForward=new THREE.Vector3();
   const lookAt = new THREE.Vector3();
   const smoothedLook = new THREE.Vector3();
   function snapCamera(): void {
@@ -310,6 +323,7 @@ try {
     ctx.fillStyle = '#687766'; ctx.font = 'bold 10px sans-serif'; ctx.fillText('N ↑', w - 20, 20);
   }
   function updateHud(): void {
+    element('traffic-status').textContent=traffic?.status??'Traffic unavailable';
     element('money').textContent = `₹${progress.money.toLocaleString('en-IN')}`;
     element('trips').textContent = String(progress.trips);
     element('speed').textContent = String(Math.round(Math.abs(car.speed) * 3.6));
@@ -371,10 +385,13 @@ try {
     const dt = Math.min(realDt, 0.1); last = now;
     if (graphics.observeFrame(realDt)) applyGraphics();
     elapsed += dt;
+    traffic?.update(dt,car,graphics.lowDetail,started&&!paused);
     if (started && !paused) {
       const steps = Math.max(1, Math.ceil(dt / (1 / 90)));
       for (let n = 0; n < steps; n++) {
+        const oldX=car.x,oldZ=car.z;
         const hit = advanceCar(car, input.controls, dt / steps, world.colliders, realWorld ?? undefined);
+        if(traffic?.blocksPlayer(car.x,car.z,car.heading)){car.x=oldX;car.z=oldZ;car.speed=0;if(elapsed-lastToast>3){toast('Traffic ahead · wait for a clear gap or use Display to clear nearby traffic.');lastToast=elapsed;}}
         if (hit && elapsed - lastToast > 3) { toast('Easy there! Use R to get back on the road.'); lastToast = elapsed; }
       }
       if (elapsed - lastSave > 2) { save(); lastSave = elapsed; }
@@ -406,6 +423,7 @@ try {
     camera.position.lerp(desiredCamera, 1 - Math.exp(-dt * 5));
     smoothedLook.lerp(lookAt, 1 - Math.exp(-dt * 8)); camera.lookAt(smoothedLook);
     audio.update(car.speed, started && !paused);
+    audio.updateTraffic(traffic?.sim.agents??[],camera.position,camera.getWorldDirection(audioForward),started&&!paused,dt);
     hudClock += dt;
     if (hudClock > 0.1) { updateHud(); hudClock = 0; }
     atmosphere.update(camera.position);

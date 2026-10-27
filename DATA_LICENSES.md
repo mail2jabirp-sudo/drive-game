@@ -32,3 +32,9 @@ The optional HGT importer targets the public Mapzen/Tilezen composite archive. D
 ## Unified district derivative
 
 `public/maps/district/` combines the verified road selection from `export.osm` with reprojected prior Kottakkal footprints, landmarks, water and place nodes from `map.osm`. It is distributed under ODbL1.0 with ©OpenStreetMap contributors attribution; both original source XML files and earlier derivatives remain available in this repository. Reproduce with `scripts/import_district.py`; checksums/projections and retained source identities are in `data/DISTRICT_PROVENANCE.json` and the public manifest. This is partial 36km-square road coverage, not a district boundary or complete district. Cafe gameplay stops, roof/material choices and estimated building heights are explicit authored approximations.
+
+## Traffic control derivative and original traffic artwork
+
+`public/maps/district/traffic-controls.json` derives source-tagged signal/crossing nodes from unchanged `export.osm` and is distributed under ODbL1.0 with ©OpenStreetMap contributors attribution. Source IDs/tags, geographic projection and source checksum are retained; reproduce/check with `scripts/import_traffic_controls.py`. Signal timing, curb offsets and stripe widths are explicitly authored game approximations, not surveyed/live traffic data.
+
+Traffic meshes, canvas bus lettering and Web Audio waveforms/noise/envelopes are original MIT-licensed procedural work. The compact hatchback source is reused unchanged from the earlier project draft. No paid assets, copied logos, photographic vehicle textures or third-party recordings are used. Synthesized sounds are not authentic recordings. See TRAFFIC.md for the exact implemented categories and remaining limitations.
