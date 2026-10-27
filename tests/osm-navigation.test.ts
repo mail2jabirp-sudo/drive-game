@@ -7,11 +7,11 @@ import { createRoadGraph, nearestRoad, pointInPolygon, segmentDistance, shortest
 import { createOsmWorld } from '../src/osm-world.ts';
 const source = JSON.parse(readFileSync(new URL('../public/maps/kottakkal.json', import.meta.url), 'utf8')) as OsmMap;
 const road = (id: string, nodeIds: string[], points: {x:number;z:number}[], oneway: OsmRoad['oneway'] = 'no'): OsmRoad => ({id,sourceWayId:id,nodeIds,points,oneway,name:'Test source road',highway:'primary',layer:0,bridge:false,maxspeed:null,width:6,widthSource:'estimate',tags:{}});
-function createFixture(data: OsmMap) {
+function createFixture(data: OsmMap, terrain?: {heightAt:(x:number,z:number)=>number}) {
   const previous = globalThis.document;
   const context = new Proxy({createImageData:(w:number,h:number)=>({data:new Uint8ClampedArray(w*h*4)})}, {get(target,key) {return key in target ? target[key as keyof typeof target] : ()=>{};},set(){return true;}});
   globalThis.document = {createElement:()=>({width:0,height:0,getContext:()=>context})} as unknown as Document;
-  try {const scene=new THREE.Scene();return {scene,world:createOsmWorld(scene,data)};}
+  try {const scene=new THREE.Scene();return {scene,world:createOsmWorld(scene,data,undefined,terrain)};}
   finally {if(previous === undefined) delete (globalThis as {document?:Document}).document;else globalThis.document=previous;}
 }
 test('source road graph obeys one-way direction and does not connect geometric overpasses',()=>{
@@ -79,4 +79,32 @@ test('every imported road segment and both passenger stops are traversable in th
   }
   for(const point of [world.spawn,world.pickup,world.dropoff])assert.equal(world.isBlocked(point.x,point.z),false);
   world.dispose();
+});
+
+// Synthetic plane exercises rendering and drivable geometry, never serves as Kerala terrain data.
+test('optional terrain places road pavement, junction discs and ground in the same metre frame',()=>{
+  const fixture:OsmMap={...source,roads:[road('slope',['a','b','c'],[{x:0,z:0},{x:100,z:0},{x:200,z:100}])],buildings:[],landmarks:[],water:[],intersections:[]};
+  const heightAt=(x:number,z:number)=>x*0.1+z*0.05;
+  const {scene,world}=createFixture(fixture,{heightAt});
+  let ground=false,roadVertices=0;
+  scene.traverse(object=>{
+    if(!(object instanceof THREE.Mesh))return;
+    const positions=object.geometry.getAttribute('position');
+    if(object.name==='DEM terrain surface'){ground=true;assert.ok(positions.count>6000);return;}
+    for(let i=0;i<positions.count;i++){
+      const x=positions.getX(i),z=positions.getZ(i),height=positions.getY(i);
+      assert.ok(Math.abs(height-heightAt(x,z))<0.05,'rendered roads and joins follow sampled metre heights');
+      roadVertices++;
+    }
+  });
+  assert.ok(ground&&roadVertices>100);assert.equal(world.heightAt(100,0),10);
+  assert.ok(world.roadSurface(150,50));assert.ok(!world.isBlocked(150,50));world.dispose();
+});
+
+test('large unified worlds retain a nearby bounded ground patch at distant road coordinates',()=>{
+ const fixture:OsmMap={...source,bounds:{minX:-18000,maxX:18000,minZ:-18000,maxZ:18000},roads:[road('far',['a','b','c'],[{x:-9000,z:6000},{x:-8800,z:6000},{x:-8600,z:6000}])],buildings:[],landmarks:[],water:[],intersections:[]};
+ const {scene,world}=createFixture(fixture);world.update(0,new THREE.Vector3(-9000,6.4,6000),true);
+ const ground=scene.getObjectByName('Flat map ground') as THREE.Mesh;const bounds=new THREE.Box3().setFromObject(ground);
+ assert.ok(bounds.max.x-bounds.min.x<=2400);assert.ok(bounds.max.z-bounds.min.z<=2400);
+ assert.ok(bounds.containsPoint(new THREE.Vector3(-9000,-0.025,6000)));assert.ok(world.roadSurface(-8900,6000));world.dispose();
 });

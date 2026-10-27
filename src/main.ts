@@ -27,22 +27,12 @@ const practicePose = {x:progress.x, z:progress.z, heading:progress.heading, phas
 let osmRide = readOsmRide(rawSave);
 let exportRide = readOsmRide(rawSave,'exportRide');
 let mapId: string | null = null;
-const requestedWorld = new URLSearchParams(location.search).get('world');
-let storedWorld: string | null = null;
-try { storedWorld = localStorage.getItem(WORLD_KEY); } catch { /* Optional preference. */ }
-const validArea = (value:string|null):value is 'osm'|'practice'|'malappuram' => ['osm','practice','malappuram'].includes(value ?? '');
-const area = validArea(requestedWorld) ? requestedWorld : validArea(storedWorld) ? storedWorld : rawSave ? 'practice' : 'osm';
-const isReal = area !== 'practice';
-const isExport = area === 'malappuram';
-const worldSelect = element<HTMLSelectElement>('world-select');
-worldSelect.value = area;
-try { localStorage.setItem(WORLD_KEY, worldSelect.value); } catch { /* Optional area preference. */ }
-document.body.classList.toggle('osm-mode', isReal);
-worldSelect.addEventListener('change', () => {
-  const next = validArea(worldSelect.value) ? worldSelect.value : 'practice';
-  try { localStorage.setItem(WORLD_KEY, next); } catch { /* Navigation still works without storage. */ }
-  const url = new URL(location.href); url.searchParams.set('world', next); location.assign(url.href);
-});
+// Legacy URLs and area preferences all enter the same geographic district world.
+let previousWorld: string|null=null;
+try {previousWorld=localStorage.getItem(WORLD_KEY);localStorage.setItem(WORLD_KEY,'malappuram');}catch{/* Optional preference only. */}
+const isReal = true;
+const isExport = true;
+document.body.classList.add('osm-mode');
 const audio = new GameAudio();
 let started = false;
 let paused = false;
@@ -101,8 +91,8 @@ try {
   let mapData: OsmMap | null = null;
   let streamed: Awaited<ReturnType<typeof createStreamedRoadWorld>> | null = null;
   if (isExport) {
-    element('loading').textContent = 'Loading nearby Malappuram road tiles…';
-    streamed = await createStreamedRoadWorld(scene, exportRide ?? undefined);
+    element('loading').textContent = 'Loading nearby Malappuram District roads…';
+    streamed = await createStreamedRoadWorld(scene, exportRide ?? undefined, osmRide ?? undefined, previousWorld);
     mapData = streamed.data; mapId = mapData.source.sha256;
   } else if (isReal) {
     element('loading').textContent = 'Loading Kottakkal roads from your map.osm…';
@@ -115,24 +105,28 @@ try {
   const landscape = isReal ? {update: (_camera:THREE.Vector3) => {}, setLowDetail: (_low:boolean) => {}, chunkCount:0} : createLandscape(scene);
   const realWorld = streamed?.world ?? (mapData ? createOsmWorld(scene, mapData) : null);
   const world = realWorld ?? createWorld(scene);
+  const groundHeight = (x:number,z:number) => realWorld?.heightAt(x,z) ?? 0;
+  const carHeight = () => groundHeight(car.x,car.z);
   const pickup = realWorld?.pickup ?? PICKUP;
   const dropoff = realWorld?.dropoff ?? DROPOFF;
   const spawn = realWorld?.spawn ?? {x:SPAWN.x,z:SPAWN.z,heading:0};
   const tea = realWorld ? realWorld.tea : TEA_STOP;
+  if(streamed?.manifest.teaStop)document.querySelector('#tea-panel h2')!.textContent=streamed.manifest.teaStop.name;
   const surface = realWorld ?? {roadSurface:onRoad, isBlocked:(x:number,z:number)=>blocked(x,z,world.colliders)};
   if (realWorld) {
-    const ride = isExport ? exportRide : osmRide;
+    const ride = streamed?.restoredRide ?? (isExport ? exportRide : osmRide);
     const compatible = ride?.mapId === mapId;
     car.x = compatible ? ride!.x : spawn.x;
     car.z = compatible ? ride!.z : spawn.z;
     car.heading = compatible ? ride!.heading : spawn.heading;
-    progress.phase = ride?.phase ?? 'pickup';
+    progress.phase = streamed?.restoredRide?.phase ?? ride?.phase ?? progress.phase;
   }
   element('map-attribution').hidden = !isReal;
-  document.querySelector('.practice-notice')!.textContent = isExport ? 'Road-only export · nearby tiles · 4.8 km initial window, not the whole district.' : isReal ? 'OSM roads and footprints · approximate buildings and heights · flat terrain.' : 'Fictional practice loop · real map available in the area selector.';
-  document.querySelector('.welcome-eyebrow')!.textContent = isExport ? 'MALAPPURAM ROAD EXPORT · NEARBY TILES' : isReal ? 'KOTTAKKAL · OPENSTREETMAP EXTRACT' : 'KOTTAKKAL INSPIRED · PRACTICE';
-  document.querySelector('.welcome-footer span:last-child')!.textContent = isExport ? 'VERIFIED SOURCE ROADS · FLAT TERRAIN' : isReal ? 'OSM GEOMETRY · APPROXIMATE BUILDING MODELS' : 'ORIGINAL FICTIONAL PRACTICE AREA';
-  document.querySelector('.map-heading > span')!.textContent = isExport ? 'MALAPPURAM · ROAD TILES' : isReal ? 'KOTTAKKAL · OSM' : 'FICTIONAL PRACTICE LOOP';
+  if(streamed?.terrainSource)element('map-attribution').append(document.createTextNode(` · Terrain: ${streamed.terrainSource.attribution}`));
+  document.querySelector('.practice-notice')!.textContent = isExport ? 'Malappuram District · verified roads in a 36 km window · partial coverage, not the full district.' : isReal ? 'OSM roads and footprints · approximate buildings and heights · flat terrain.' : 'Fictional practice loop · real map available in the area selector.';
+  document.querySelector('.welcome-eyebrow')!.textContent = isExport ? 'MALAPPURAM DISTRICT · മലപ്പുറം ജില്ല' : isReal ? 'KOTTAKKAL · OPENSTREETMAP EXTRACT' : 'KOTTAKKAL INSPIRED · PRACTICE';
+  document.querySelector('.welcome-footer span:last-child')!.textContent = isExport ? (streamed?.terrainSource ? 'SOURCE ROADS · DEM TERRAIN PROTOTYPE' : 'VERIFIED SOURCE ROADS · FLAT TERRAIN') : isReal ? 'OSM GEOMETRY · APPROXIMATE BUILDING MODELS' : 'ORIGINAL FICTIONAL PRACTICE AREA';
+  document.querySelector('.map-heading > span')!.textContent = isExport ? 'MALAPPURAM DISTRICT' : isReal ? 'KOTTAKKAL · OSM' : 'FICTIONAL PRACTICE LOOP';
   const rickshaw = createRickshaw();
   scene.add(rickshaw.group);
   if (surface.isBlocked(car.x, car.z)) {
@@ -150,8 +144,8 @@ try {
     scene.add(group);
     return group;
   }
-  const pickupMarker = missionMarker(0xf5b83c); pickupMarker.position.set(pickup.x,0,pickup.z);
-  const dropoffMarker = missionMarker(0x2da99a); dropoffMarker.position.set(dropoff.x,0,dropoff.z);
+  const pickupMarker = missionMarker(0xf5b83c); pickupMarker.position.set(pickup.x,groundHeight(pickup.x,pickup.z),pickup.z);
+  const dropoffMarker = missionMarker(0x2da99a); dropoffMarker.position.set(dropoff.x,groundHeight(dropoff.x,dropoff.z),dropoff.z);
   // A passenger appears in the cabin only while a fare is active.
   const passenger = new THREE.Group();
   const shirt = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.52, 0.33), new THREE.MeshStandardMaterial({ color: '#d36b4d' }));
@@ -167,6 +161,7 @@ try {
     for (const x of [-0.14,0.14]) {const leg = new THREE.Mesh(new THREE.BoxGeometry(0.17,0.7,0.22),trousers);leg.position.set(x,0.48,0);waitingPassenger.add(leg);}
     waitingPassenger.add(body,face);
     waitingPassenger.position.set(pickup.x-Math.cos(spawn.heading)*3,0,pickup.z+Math.sin(spawn.heading)*3);
+    waitingPassenger.position.y=groundHeight(waitingPassenger.position.x,waitingPassenger.position.z);
     scene.add(waitingPassenger);
   }
   const target = () => progress.phase === 'pickup' ? pickup : dropoff;
@@ -234,14 +229,6 @@ try {
     save();
     element<HTMLCanvasElement>('game').focus();
   });
-  element('change-area').addEventListener('click', () => {
-    if (paused) pause();
-    if (started) save();
-    started = false; paused = false; car.speed = 0; input.clear();
-    element('start-screen').hidden = false; document.body.classList.remove('playing', 'paused');
-    element<HTMLDetailsElement>('display-settings').open = false;
-    worldSelect.focus();
-  });
   element('interact-button').addEventListener('click', interact);
   element('reset-button').addEventListener('click', () => { if (started && !paused) resetCar(); });
   element('pause-button').addEventListener('click', pause);
@@ -255,15 +242,16 @@ try {
   window.addEventListener('pagehide', save);
   document.addEventListener('visibilitychange', () => { if (document.hidden && started) { save(); if (!paused) pause(); } });
 
-  const cameraObstacles = world.colliders.map(b => new THREE.Box3(new THREE.Vector3(b.minX, 0, b.minZ), new THREE.Vector3(b.maxX, 17, b.maxZ)));
+  let cameraColliderSource = world.colliders;
+  let cameraObstacles = cameraColliderSource.map(b => new THREE.Box3(new THREE.Vector3(b.minX, 0, b.minZ), new THREE.Vector3(b.maxX, 17, b.maxZ)));
   const cameraRay = new THREE.Ray();
   const cameraHit = new THREE.Vector3();
   const desiredCamera = new THREE.Vector3();
   const lookAt = new THREE.Vector3();
   const smoothedLook = new THREE.Vector3();
   function snapCamera(): void {
-    camera.position.set(car.x + Math.sin(car.heading) * 10, 6.4, car.z + Math.cos(car.heading) * 10);
-    smoothedLook.set(car.x - Math.sin(car.heading) * 5, 1.2, car.z - Math.cos(car.heading) * 5);
+    camera.position.set(car.x + Math.sin(car.heading) * 10, carHeight()+6.4, car.z + Math.cos(car.heading) * 10);
+    smoothedLook.set(car.x - Math.sin(car.heading) * 5, carHeight()+1.2, car.z - Math.cos(car.heading) * 5);
     camera.lookAt(smoothedLook);
   }
   snapCamera();
@@ -314,6 +302,8 @@ try {
     ctx.save(); ctx.translate(sx(car.x), sz(car.z)); ctx.rotate(-car.heading);
     ctx.beginPath(); ctx.moveTo(0, -7); ctx.lineTo(5, 6); ctx.lineTo(0, 3); ctx.lineTo(-5, 6); ctx.closePath();
     ctx.fillStyle = '#1c3833'; ctx.fill(); ctx.strokeStyle = 'white'; ctx.lineWidth = 1.5; ctx.stroke(); ctx.restore();
+    ctx.fillStyle='#294a3a';ctx.font='9px sans-serif';
+    for(const place of streamed?.manifest.places ?? []){const x=sx(place.x),z=sz(place.z);if(x>12&&x<w-40&&z>35&&z<h-15)ctx.fillText(place.nameMl ? `${place.name} · ${place.nameMl}` : place.name,x,z);}
     ctx.fillStyle = '#687766'; ctx.font = 'bold 10px sans-serif'; ctx.fillText('N ↑', w - 20, 20);
   }
   function updateHud(): void {
@@ -321,7 +311,7 @@ try {
     element('trips').textContent = String(progress.trips);
     element('speed').textContent = String(Math.round(Math.abs(car.speed) * 3.6));
     const pickingUp = progress.phase === 'pickup';
-    element('mission-title').textContent = isExport ? pickingUp ? 'Malappuram road fare' : 'Passenger aboard' : isReal ? pickingUp ? 'Kottakkal road fare' : 'Passenger aboard' : pickingUp ? 'A ride to the market' : 'Next stop: market';
+    element('mission-title').textContent = isExport ? pickingUp ? 'Malappuram District fare' : 'Passenger aboard' : isReal ? pickingUp ? 'Kottakkal road fare' : 'Passenger aboard' : pickingUp ? 'A ride to the market' : 'Next stop: market';
     element('mission-description').textContent = realWorld ? pickingUp ? `Stop at ${realWorld.mission.pickupName}.` : `Follow the map route to ${realWorld.mission.dropoffName}.` : pickingUp ? 'A passenger is waiting outside the bakery. Pull into the gold circle.' : 'Passenger aboard. Follow the loop to the market bus stand and stop in the teal circle.';
     element('stream-status').hidden = !streamed;
     if(streamed) {const status=streamed.world.streaming;element('stream-status').textContent=status.error || `${status.resident}/${status.total} road tiles${status.loading ? ' · loading nearby…' : ' · nearby only'}`;}
@@ -330,7 +320,8 @@ try {
     element('location-label').textContent = car.z < -40 ? 'Market Road' : car.x < -45 ? 'Chaya Corner' : car.z > 40 ? 'Palm Avenue' : 'Bakery Road';
     if (mapData) {
       const nearest = nearestRoad(mapData.roads, {x:car.x,z:car.z});
-      element('location-label').textContent = nearest?.road.name || nearest?.road.highway || 'Kottakkal';
+      const nearbyPlace=streamed?.manifest.places?.filter(p=>Math.hypot(p.x-car.x,p.z-car.z)<1200).sort((a,b)=>Math.hypot(a.x-car.x,a.z-car.z)-Math.hypot(b.x-car.x,b.z-car.z))[0];
+      element('location-label').textContent = nearbyPlace ? `${nearbyPlace.name}${nearbyPlace.nameMl ? ` · ${nearbyPlace.nameMl}` : ''}` : nearest?.road.name || nearest?.road.highway || 'Malappuram District';
       element('road-rules').textContent = nearest ? `${nearest.road.oneway !== 'no' ? 'One-way · ' : ''}${nearest.road.maxspeed === null ? 'limit unmapped' : `${nearest.road.maxspeed} km/h OSM`}` : 'Road data unavailable';
     }
     const nearby = distance() <= 8;
@@ -385,22 +376,30 @@ try {
       }
       if (elapsed - lastSave > 2) { save(); lastSave = elapsed; }
     }
-    rickshaw.group.position.set(car.x, 0.08, car.z); rickshaw.group.rotation.y = car.heading;
+    rickshaw.group.position.set(car.x, carHeight()+0.08, car.z);
+    rickshaw.group.rotation.order='YXZ';rickshaw.group.rotation.y=car.heading;
+    const dx=-Math.sin(car.heading),dz=-Math.cos(car.heading);
+    const pitch=Math.atan2(groundHeight(car.x+dx,car.z+dz)-groundHeight(car.x-dx,car.z-dz),2);
+    const rx=Math.cos(car.heading),rz=-Math.sin(car.heading);
+    const roll=Math.atan2(groundHeight(car.x+rx,car.z+rz)-groundHeight(car.x-rx,car.z-rz),2);
+    rickshaw.group.rotation.x+=(pitch-rickshaw.group.rotation.x)*(1-Math.exp(-dt*8));
+    rickshaw.group.rotation.z+=(roll-rickshaw.group.rotation.z)*(1-Math.exp(-dt*8));
     rickshaw.animate(paused ? 0 : car.speed, car.steering, elapsed);
     if (realWorld) realWorld.update(elapsed, camera.position, graphics.lowDetail); else world.update(elapsed, camera.position);
     landscape.update(camera.position);
-    sun.position.set(car.x - 45, 70, car.z + 25);
-    sun.target.position.set(car.x, 0, car.z);
+    sun.position.set(car.x - 45, carHeight()+70, car.z + 25);
+    sun.target.position.set(car.x, carHeight(), car.z);
     pickupMarker.children[2].position.y = dropoffMarker.children[2].position.y = 5 + Math.sin(elapsed * 2) * 0.3;
-    desiredCamera.set(car.x + Math.sin(car.heading) * (10 + Math.abs(car.speed) * 0.07), 6.4 + Math.abs(car.speed) * 0.04, car.z + Math.cos(car.heading) * (10 + Math.abs(car.speed) * 0.07));
-    cameraRay.origin.set(car.x, 1.5, car.z);
+    desiredCamera.set(car.x + Math.sin(car.heading) * (10 + Math.abs(car.speed) * 0.07), carHeight()+6.4 + Math.abs(car.speed) * 0.04, car.z + Math.cos(car.heading) * (10 + Math.abs(car.speed) * 0.07));
+    cameraRay.origin.set(car.x, carHeight()+1.5, car.z);
     cameraRay.direction.copy(desiredCamera).sub(cameraRay.origin).normalize();
     let cameraDistance = cameraRay.origin.distanceTo(desiredCamera);
+    if(cameraColliderSource!==world.colliders){cameraColliderSource=world.colliders;cameraObstacles=cameraColliderSource.map(b=>new THREE.Box3(new THREE.Vector3(b.minX,0,b.minZ),new THREE.Vector3(b.maxX,17,b.maxZ)));}
     for (const box of cameraObstacles) {
       if (cameraRay.intersectBox(box, cameraHit)) cameraDistance = Math.min(cameraDistance, Math.max(2.5, cameraRay.origin.distanceTo(cameraHit) - 0.6));
     }
     desiredCamera.copy(cameraRay.origin).addScaledVector(cameraRay.direction, cameraDistance);
-    lookAt.set(car.x - Math.sin(car.heading) * 5, 1.25, car.z - Math.cos(car.heading) * 5);
+    lookAt.set(car.x - Math.sin(car.heading) * 5, carHeight()+1.25, car.z - Math.cos(car.heading) * 5);
     camera.position.lerp(desiredCamera, 1 - Math.exp(-dt * 5));
     smoothedLook.lerp(lookAt, 1 - Math.exp(-dt * 8)); camera.lookAt(smoothedLook);
     audio.update(car.speed, started && !paused);
@@ -423,7 +422,10 @@ try {
   element('fatal-error').hidden = false;
   element('fatal-error').textContent = isExport ? 'Unable to load the uploaded road tiles or 3D graphics. Your saved progress is safe. ' : isReal ? 'Unable to load the real Kottakkal map or 3D graphics. Your saved progress is safe. ' : 'Unable to start 3D graphics. Enable hardware acceleration or use a WebGL-capable browser, then reload. ';
   if (isReal) {
-    const fallback = document.createElement('a'); fallback.href = '?world=practice'; fallback.textContent = 'Open the original practice game';
+    const fallback = document.createElement('a');
+    const terrainRequested=isExport&&new URLSearchParams(location.search).get('terrain')==='1';
+    if(terrainRequested) element('fatal-error').textContent='The terrain prototype requires a verified local DEM. Your saves are safe. ';
+    fallback.href = location.pathname; fallback.textContent = terrainRequested ? 'Open Malappuram District without terrain' : 'Retry Malappuram District';
     element('fatal-error').append(fallback);
   }
 }

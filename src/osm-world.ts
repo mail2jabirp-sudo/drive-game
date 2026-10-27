@@ -1,13 +1,15 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { roadPieces } from './elevation';
 import { createTownMaterials } from './materials';
 import type { MapPoint, OsmMap, OsmRoad } from './osm-types';
 import { nearestRoad, pointInPolygon, segmentDistance, selectMissionStops } from './osm-navigation';
 import type { Collider } from './world';
 
 /** Render a bounded source-data slice, not a fabricated road network or surveyed building model. */
-export function createOsmWorld(scene: THREE.Scene, data: OsmMap, missionOverride?: ReturnType<typeof selectMissionStops>): {
+export function createOsmWorld(scene: THREE.Scene, data: OsmMap, missionOverride?: ReturnType<typeof selectMissionStops>, terrain?: {heightAt:(x:number,z:number)=>number}): {
   colliders: Collider[];
+  heightAt:(x:number,z:number)=>number;
   update: (elapsed: number, cameraPosition: THREE.Vector3, lowDetail?: boolean) => void;
   dispose: () => void;
   roadSurface: (x: number, z: number) => boolean;
@@ -22,16 +24,28 @@ export function createOsmWorld(scene: THREE.Scene, data: OsmMap, missionOverride
   const root = new THREE.Group(); root.name = 'OSM Kottakkal source geometry'; scene.add(root);
   const townMaterial = createTownMaterials();
   const asphalt = townMaterial('#535e60');
+  const shoulder = new THREE.MeshStandardMaterial({color:'#817a68',roughness:1});
+  const unpaved = townMaterial('#9cb57c');
+  const concrete = townMaterial('#c9c6ae');
+  const heightAt = (x:number,z:number) => terrain?.heightAt(Math.max(data.bounds.minX,Math.min(data.bounds.maxX,x)),Math.max(data.bounds.minZ,Math.min(data.bounds.maxZ,z))) ?? 0;
   const wall = townMaterial('#c2c8ae'); wall.vertexColors = true;
   const roof = new THREE.MeshStandardMaterial({ color: '#9b9687', roughness: 0.98, vertexColors: true });
   const windows = new THREE.MeshStandardMaterial({ color: '#526963', roughness: 0.42, metalness: 0.1, side: THREE.DoubleSide });
   const roadPaint = new THREE.MeshStandardMaterial({ color: '#d2ccaf', roughness: 1 });
   const waterMaterial = new THREE.MeshStandardMaterial({ color: '#708e85', roughness: 0.35, metalness: 0.1, side: THREE.DoubleSide });
-  const ground = new THREE.Mesh(new THREE.PlaneGeometry(data.bounds.maxX - data.bounds.minX + 20, data.bounds.maxZ - data.bounds.minZ + 20), townMaterial('#9cb57c'));
-  ground.rotation.x = -Math.PI / 2; ground.position.set((data.bounds.minX + data.bounds.maxX) / 2, -0.025, (data.bounds.minZ + data.bounds.maxZ) / 2);
-  const groundUv = ground.geometry.getAttribute('uv');
-  for (let i=0;i<groundUv.count;i++) groundUv.setXY(i,groundUv.getX(i)*(data.bounds.maxX-data.bounds.minX)/4,groundUv.getY(i)*(data.bounds.maxZ-data.bounds.minZ)/4);
-  ground.receiveShadow = true; root.add(ground);
+  const centerX=(data.bounds.minX+data.bounds.maxX)/2,centerZ=(data.bounds.minZ+data.bounds.maxZ)/2;
+  // A nearby flat patch avoids huge-triangle depth precision hiding roads far from the origin.
+  const groundWidth=terrain?data.bounds.maxX-data.bounds.minX+20:Math.min(2400,data.bounds.maxX-data.bounds.minX+20);
+  const groundDepth=terrain?data.bounds.maxZ-data.bounds.minZ+20:Math.min(2400,data.bounds.maxZ-data.bounds.minZ+20);
+  const groundGeometry = new THREE.PlaneGeometry(groundWidth,groundDepth,terrain?80:1,terrain?80:1);
+  groundGeometry.rotateX(-Math.PI/2);
+  if(terrain){const positions=groundGeometry.getAttribute('position');for(let i=0;i<positions.count;i++)positions.setY(i,heightAt(positions.getX(i)+centerX,positions.getZ(i)+centerZ));groundGeometry.computeVertexNormals();}
+  const ground = new THREE.Mesh(groundGeometry,townMaterial('#9cb57c'));
+  ground.name=terrain?'DEM terrain surface':'Flat map ground';
+  ground.position.set(centerX,-0.025,centerZ);
+  const groundUv=ground.geometry.getAttribute('uv');
+  for(let i=0;i<groundUv.count;i++)groundUv.setXY(i,groundUv.getX(i)*groundWidth/4,groundUv.getY(i)*groundDepth/4);
+  ground.receiveShadow=true;root.add(ground);
   interface Batch { geometries: THREE.BufferGeometry[]; material: THREE.Material; detail: boolean }
   interface Chunk { group: THREE.Group; x: number; z: number; batches: Map<string, Batch>; radius: number; detail: THREE.Mesh[] }
   const chunks = new Map<string, Chunk>();
@@ -77,6 +91,7 @@ export function createOsmWorld(scene: THREE.Scene, data: OsmMap, missionOverride
       a.x - ox, height, a.z - oz, b.x + ox, height, b.z + oz, b.x - ox, height, b.z - oz,
     ], 3));
     geometry.setAttribute('uv', new THREE.Float32BufferAttribute([0, 0, 0, length / 3, width / 3, 0, width / 3, 0, 0, length / 3, width / 3, length / 3], 2));
+    if(terrain){const p=geometry.getAttribute('position');for(let i=0;i<p.count;i++)p.setY(i,p.getY(i)+heightAt(p.getX(i),p.getZ(i)));}
     geometry.computeVertexNormals();
     // Order above faces up for both north- and east-bound segments.
     return geometry;
@@ -92,17 +107,25 @@ export function createOsmWorld(scene: THREE.Scene, data: OsmMap, missionOverride
   for (const road of data.roads) for (let i = 1; i < road.points.length; i++) {
     const a = road.points[i - 1], b = road.points[i], middle = { x: (a.x + b.x) / 2, z: (a.z + b.z) / 2 };
     const y = 0.035 + road.layer * 0.001;
-    addGeometry(lineQuad(a, b, road.width, y), asphalt, middle);
-    // Round each actual source vertex to join adjoining strip segments; no invented connections.
-    const disc = new THREE.CircleGeometry(road.width / 2, 10); disc.rotateX(-Math.PI / 2); disc.translate(a.x, y, a.z);
-    addGeometry(disc, asphalt, a);
-    if (i === road.points.length - 1) {
-      const end = new THREE.CircleGeometry(road.width / 2, 10); end.rotateX(-Math.PI / 2); end.translate(b.x, y, b.z); addGeometry(end, asphalt, b);
+    const surface = road.tags.surface;
+    const roadMaterial = ['gravel','unpaved','dirt','ground','compacted','earth'].includes(surface) ? unpaved : surface==='concrete' ? concrete : asphalt;
+    const pieces=terrain?roadPieces(a,b):[{a,b}];
+    for(const piece of pieces){
+      const middlePiece={x:(piece.a.x+piece.b.x)/2,z:(piece.a.z+piece.b.z)/2};
+      // Authored gravel verge only; not a claim of surveyed shoulders or sidewalks.
+      if(['trunk','primary','secondary','tertiary'].includes(road.highway)) addGeometry(lineQuad(piece.a,piece.b,road.width+1.2,y-0.009),shoulder,middlePiece);
+      addGeometry(lineQuad(piece.a,piece.b,road.width,y),roadMaterial,middlePiece);
     }
+    const join=(p:MapPoint)=>{
+      const disc=new THREE.CircleGeometry(road.width/2,12);disc.rotateX(-Math.PI/2);disc.translate(p.x,y,p.z);
+      if(terrain){const positions=disc.getAttribute('position');for(let i=0;i<positions.count;i++)positions.setY(i,y+heightAt(positions.getX(i),positions.getZ(i)));disc.computeVertexNormals();}
+      addGeometry(disc,roadMaterial,p);
+    };
+    join(a);if(i===road.points.length-1)join(b);
     register(segmentCells, { a, b, road }, { minX: Math.min(a.x, b.x) - road.width, maxX: Math.max(a.x, b.x) + road.width, minZ: Math.min(a.z, b.z) - road.width, maxZ: Math.max(a.z, b.z) + road.width });
     // Neutral centre guidance on wider two-way roads; this is authored paint, not imported lane survey.
     const length = Math.hypot(b.x - a.x, b.z - a.z);
-    if (road.oneway === 'no' && road.width >= 6) for (let offset = 2; offset + 2 < length; offset += 8) {
+    if (roadMaterial!==unpaved && road.oneway === 'no' && road.width >= 6) for (let offset = 2; offset + 2 < length; offset += 8) {
       const start = offset / length, end = (offset + 2.5) / length;
       addGeometry(lineQuad({ x: a.x + (b.x - a.x) * start, z: a.z + (b.z - a.z) * start }, { x: a.x + (b.x - a.x) * end, z: a.z + (b.z - a.z) * end }, 0.1, y + 0.008), roadPaint, middle, true);
     }
@@ -181,9 +204,10 @@ export function createOsmWorld(scene: THREE.Scene, data: OsmMap, missionOverride
   }
   const stops = missionOverride ?? selectMissionStops(data);
   return {
-    colliders, roadSurface, isBlocked, spawn: stops.spawn, pickup: stops.pickup, dropoff: stops.dropoff, tea: null,
+    colliders, heightAt, roadSurface, isBlocked, spawn: stops.spawn, pickup: stops.pickup, dropoff: stops.dropoff, tea: null,
     mission: { pickupName: stops.pickupName, dropoffName: stops.dropoffName, route: stops.route }, chunkCount: chunks.size,
     update(_elapsed, cameraPosition, lowDetail = false) {
+      if(!terrain){ground.position.x=Math.round(cameraPosition.x/600)*600;ground.position.z=Math.round(cameraPosition.z/600)*600;}
       for (const chunk of chunks.values()) {
         const distance = Math.hypot(cameraPosition.x - chunk.x, cameraPosition.z - chunk.z);
         chunk.group.visible = distance < (lowDetail ? 220 : 330) + chunk.radius;

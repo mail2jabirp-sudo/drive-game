@@ -7,7 +7,8 @@ ROOT=Path(__file__).resolve().parents[1]
 SOURCE=ROOT/'export.osm'; OUT=ROOT/'public/maps/malappuram'
 R=6371008.8; EXTENT=2400; SIZE=600; ORIGIN_WAY='169318337'
 def encode(value): return (json.dumps(value,ensure_ascii=False,separators=(',',':'),allow_nan=False)+'\n').encode()
-def generate(output=OUT, provenance_path=None):
+def generate(output=OUT, provenance_path=None, extent=EXTENT):
+    if extent<2400 or extent%SIZE:raise ValueError("Extent must be a multiple of 600m, at least 2400m")
     OUT=output
     digest=hashlib.sha256(); size=0
     with SOURCE.open('rb') as f:
@@ -50,12 +51,12 @@ def generate(output=OUT, provenance_path=None):
         fragments={}
         for index in range(1,len(refs)):
             a,b=project(refs[index-1]),project(refs[index])
-            region=clipped_segment(a,b,EXTENT)
+            region=clipped_segment(a,b,extent)
             if region is None: continue
             ra,rb=region[2:]
             if math.hypot(ra['x']-rb['x'],ra['z']-rb['z'])<0.001:continue
-            minx=max(-4,math.floor(min(ra['x'],rb['x'])/SIZE));maxx=min(3,math.floor(max(ra['x'],rb['x'])/SIZE))
-            minz=max(-4,math.floor(min(ra['z'],rb['z'])/SIZE));maxz=min(3,math.floor(max(ra['z'],rb['z'])/SIZE))
+            minx=max(-extent//SIZE,math.floor(min(ra['x'],rb['x'])/SIZE));maxx=min(extent//SIZE-1,math.floor(max(ra['x'],rb['x'])/SIZE))
+            minz=max(-extent//SIZE,math.floor(min(ra['z'],rb['z'])/SIZE));maxz=min(extent//SIZE-1,math.floor(max(ra['z'],rb['z'])/SIZE))
             for ix in range(minx,maxx+1):
                 for iz in range(minz,maxz+1):
                     cx,cz=(ix+0.5)*SIZE,(iz+0.5)*SIZE
@@ -82,7 +83,7 @@ def generate(output=OUT, provenance_path=None):
         filename=key.replace(',','_')+'.json'; payload=encode({'version':1,'roads':roads});(OUT/filename).write_bytes(payload)
         index[key]={'file':filename,'sha256':hashlib.sha256(payload).hexdigest(),'bytes':len(payload),'roads':len(roads),'vertices':sum(len(r['points']) for r in roads)}
     source={'file':'export.osm','sha256':digest.hexdigest(),'copyright':'© OpenStreetMap contributors','license':'https://opendatacommons.org/licenses/odbl/1-0/','upstreamCommit':'user binary attachment, reconstructed in numerical order'}
-    manifest={'version':1,'source':source,'projection':{'latitude':lat0,'longitude':lon0,'earthRadius':R},'bounds':{'minX':-EXTENT,'maxX':EXTENT,'minZ':-EXTENT,'maxZ':EXTENT},'tileSize':SIZE,'tiles':index,'origin':{'wayId':ORIGIN_WAY,'nodeId':anchor_id,'name':anchor[2]['name']},'sourceCoverage':{'nodeBounds':bbox,'counts':dict(counts),'highwayClasses':dict(classes),'metadata':meta,'administrativeBoundaryPresent':False},'stats':{'sourceBytes':size,'sourceHighwayWays':len(ways),'integratedWays':len(selected),'oneWayWays':len(one_way),'tiles':len(index),'roadFragments':sum(t['roads'] for t in index.values()),'vertices':sum(t['vertices'] for t in index.values()),'excludedRestrictedWays':restricted},'roadNames':sorted(names),'limitations':['Initial playable window only: 4.8km square around a verified source vertex of Malappuram Bypass Road, not the whole district.','No administrative boundary, building, water or turn-restriction relation coverage is established by this road-only export.','Local metre projection; no surveyed elevation. Unknown widths are estimates; untagged oneway is not legal validation.']}
+    manifest={'version':1,'source':source,'projection':{'latitude':lat0,'longitude':lon0,'earthRadius':R},'bounds':{'minX':-extent,'maxX':extent,'minZ':-extent,'maxZ':extent},'tileSize':SIZE,'tiles':index,'origin':{'wayId':ORIGIN_WAY,'nodeId':anchor_id,'name':anchor[2]['name']},'sourceCoverage':{'nodeBounds':bbox,'counts':dict(counts),'highwayClasses':dict(classes),'metadata':meta,'administrativeBoundaryPresent':False},'stats':{'sourceBytes':size,'sourceHighwayWays':len(ways),'integratedWays':len(selected),'oneWayWays':len(one_way),'tiles':len(index),'roadFragments':sum(t['roads'] for t in index.values()),'vertices':sum(t['vertices'] for t in index.values()),'excludedRestrictedWays':restricted},'roadNames':sorted(names),'limitations':[f'Playable road selection: {extent*2/1000:g}km square around a verified Malappuram Bypass vertex; partial uploaded coverage, not the whole district.' if extent!=EXTENT else 'Initial playable window only: 4.8km square around a verified source vertex of Malappuram Bypass Road, not the whole district.','No administrative boundary, building, water or turn-restriction relation coverage is established by this road-only export.','Local metre projection; no surveyed elevation. Unknown widths are estimates; untagged oneway is not legal validation.']}
     (OUT/'manifest.json').write_bytes(encode(manifest))
     provenance={**manifest,'parts':json.loads((ROOT/'.npm-cache/export-parts-validation.json').read_text())['parts']} if (ROOT/'.npm-cache/export-parts-validation.json').exists() else manifest
     # Keep reconstruction hashes reproducible even outside this preparation workspace.
@@ -93,4 +94,4 @@ def generate(output=OUT, provenance_path=None):
     print(json.dumps({'projection':manifest['projection'],'origin':manifest['origin'],'stats':manifest['stats'],'roadNames':manifest['roadNames']},ensure_ascii=False))
 if __name__=='__main__':
     import argparse
-    parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('--output',type=Path,default=OUT);parser.add_argument('--provenance',type=Path);args=parser.parse_args();generate(args.output,args.provenance)
+    parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('--output',type=Path,default=OUT);parser.add_argument('--provenance',type=Path);parser.add_argument('--extent',type=int,default=EXTENT);args=parser.parse_args();generate(args.output,args.provenance,args.extent)

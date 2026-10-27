@@ -2,9 +2,11 @@ import type { MapPoint, OsmMap, OsmRoad } from './osm-types';
 export interface RoadManifest {
   version:1; source:OsmMap['source']; projection:OsmMap['projection']; bounds:OsmMap['bounds']; tileSize:number;
   tiles:Record<string,{file:string;sha256:string;bytes:number;roads:number;vertices:number}>;
+  places?:Array<MapPoint & {id:string;name:string;nameMl:string;source:string}>;
+  legacyProjection?:OsmMap['projection'];legacySourceHash?:string;teaStop?:MapPoint & {name:string;source:string};
   stats:Record<string,number>; origin:{wayId:string;nodeId:string;name:string};
 }
-export interface RoadTile {version:1;roads:OsmRoad[]}
+export interface RoadTile {version:1;roads:OsmRoad[];buildings?:OsmMap['buildings'];landmarks?:OsmMap['landmarks'];water?:OsmMap['water']}
 export function nearbyTileKeys(manifest:RoadManifest, point:MapPoint):string[] {
   const ix=Math.floor(point.x/manifest.tileSize),iz=Math.floor(point.z/manifest.tileSize);
   const result:string[]=[];
@@ -13,7 +15,7 @@ export function nearbyTileKeys(manifest:RoadManifest, point:MapPoint):string[] {
 }
 export class RoadTileStore {
   readonly resident=new Map<string,RoadTile>();
-  constructor(readonly manifest:RoadManifest,private fetcher:typeof fetch=globalThis.fetch.bind(globalThis),private base=`${import.meta.env?.BASE_URL ?? '/'}maps/malappuram/`) {}
+  constructor(readonly manifest:RoadManifest,private fetcher:typeof fetch=globalThis.fetch.bind(globalThis),private base=`${import.meta.env?.BASE_URL ?? '/'}maps/district/`) {}
   key(point:MapPoint):string{return nearbyTileKeys(this.manifest,point).join(';');}
   async load(point:MapPoint):Promise<void> {
     const keys=nearbyTileKeys(this.manifest,point);
@@ -35,6 +37,10 @@ export class RoadTileStore {
     this.resident.clear();for(const [key,data] of loaded)this.resident.set(key,data);
   }
   hasPosition(x:number,z:number):boolean{return this.resident.has(`${Math.floor(x/this.manifest.tileSize)},${Math.floor(z/this.manifest.tileSize)}`);}
+  features(){
+    const tiles=[...this.resident.values()];
+    return {roads:this.roads(),buildings:tiles.flatMap(t=>t.buildings??[]),landmarks:tiles.flatMap(t=>t.landmarks??[]),water:tiles.flatMap(t=>t.water??[])};
+  }
   roads():OsmRoad[] {
     const seen=new Set<string>();const roads:OsmRoad[]=[];
     for(const tile of this.resident.values())for(const road of tile.roads){const key=road.sourceWayId+':'+road.nodeIds.join('/');if(!seen.has(key)){seen.add(key);roads.push(road);}}

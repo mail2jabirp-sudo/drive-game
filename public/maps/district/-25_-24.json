@@ -1,0 +1,1 @@
+{"version":1,"roads":[{"sourceWayId":"761193210","name":"","highway":"unclassified","oneway":"no","maxspeed":null,"layer":0,"bridge":false,"width":4.5,"widthSource":"estimate","tags":{"highway":"unclassified"},"id":"761193210:-25,-24:23","nodeIds":["clip:761193210:-14751.015:-14400.0","7111772420"],"points":[{"x":-14751.015,"z":-14400.0},{"x":-14752.143,"z":-14392.202}]}]}
