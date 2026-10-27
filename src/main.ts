@@ -5,6 +5,7 @@ import { createLandscape } from './landscape';
 import { createAtmosphere } from './atmosphere';
 import { DISPLAY_KEY, GraphicsBudget, parseGraphicsMode } from './graphics';
 import { createRickshaw } from './vehicle';
+import { createStreamedRoadWorld } from './streamed-world';
 import { createOsmWorld } from './osm-world';
 import type { OsmMap } from './osm-types';
 import { nearestRoad } from './osm-navigation';
@@ -24,18 +25,21 @@ try { rawSave = localStorage.getItem(SAVE_KEY); progress = parseProgress(rawSave
 catch { storageAvailable = false; }
 const practicePose = {x:progress.x, z:progress.z, heading:progress.heading, phase:progress.phase};
 let osmRide = readOsmRide(rawSave);
+let exportRide = readOsmRide(rawSave,'exportRide');
 let mapId: string | null = null;
 const requestedWorld = new URLSearchParams(location.search).get('world');
 let storedWorld: string | null = null;
 try { storedWorld = localStorage.getItem(WORLD_KEY); } catch { /* Optional preference. */ }
-const isReal = (requestedWorld === 'osm' || requestedWorld === 'practice') ? requestedWorld === 'osm' :
-  (storedWorld === 'osm' || storedWorld === 'practice') ? storedWorld === 'osm' : !rawSave;
+const validArea = (value:string|null):value is 'osm'|'practice'|'malappuram' => ['osm','practice','malappuram'].includes(value ?? '');
+const area = validArea(requestedWorld) ? requestedWorld : validArea(storedWorld) ? storedWorld : rawSave ? 'practice' : 'osm';
+const isReal = area !== 'practice';
+const isExport = area === 'malappuram';
 const worldSelect = element<HTMLSelectElement>('world-select');
-worldSelect.value = isReal ? 'osm' : 'practice';
+worldSelect.value = area;
 try { localStorage.setItem(WORLD_KEY, worldSelect.value); } catch { /* Optional area preference. */ }
 document.body.classList.toggle('osm-mode', isReal);
 worldSelect.addEventListener('change', () => {
-  const next = worldSelect.value === 'osm' ? 'osm' : 'practice';
+  const next = validArea(worldSelect.value) ? worldSelect.value : 'practice';
   try { localStorage.setItem(WORLD_KEY, next); } catch { /* Navigation still works without storage. */ }
   const url = new URL(location.href); url.searchParams.set('world', next); location.assign(url.href);
 });
@@ -57,10 +61,11 @@ function toast(message: string): void {
   toastTimer = window.setTimeout(() => element('toast').classList.remove('visible'), 4000);
 }
 function save(): void {
-  if (isReal && mapId) osmRide = {version:1, mapId, x:car.x, z:car.z, heading:car.heading, phase:progress.phase};
+  if (isExport && mapId) exportRide = {version:1,mapId,x:car.x,z:car.z,heading:car.heading,phase:progress.phase};
+  else if (isReal && mapId) osmRide = {version:1, mapId, x:car.x, z:car.z, heading:car.heading, phase:progress.phase};
   else { progress.x = car.x; progress.z = car.z; progress.heading = car.heading; }
   try {
-    localStorage.setItem(SAVE_KEY, serializeRouteProgress(progress, isReal ? practicePose : null, osmRide));
+    localStorage.setItem(SAVE_KEY, serializeRouteProgress(progress, isReal ? practicePose : null, osmRide, exportRide));
     storageAvailable = true;
     element('save-status').textContent = 'Progress saved on this device';
   } catch {
@@ -94,7 +99,12 @@ try {
   sun.shadow.normalBias = 0.045;
   scene.add(sun, sun.target);
   let mapData: OsmMap | null = null;
-  if (isReal) {
+  let streamed: Awaited<ReturnType<typeof createStreamedRoadWorld>> | null = null;
+  if (isExport) {
+    element('loading').textContent = 'Loading nearby Malappuram road tiles…';
+    streamed = await createStreamedRoadWorld(scene, exportRide ?? undefined);
+    mapData = streamed.data; mapId = mapData.source.sha256;
+  } else if (isReal) {
     element('loading').textContent = 'Loading Kottakkal roads from your map.osm…';
     const response = await fetch(`${import.meta.env.BASE_URL}maps/kottakkal.json`);
     if (!response.ok) throw new Error(`Map request failed: ${response.status}`);
@@ -103,7 +113,7 @@ try {
     mapId = mapData.source.sha256;
   }
   const landscape = isReal ? {update: (_camera:THREE.Vector3) => {}, setLowDetail: (_low:boolean) => {}, chunkCount:0} : createLandscape(scene);
-  const realWorld = mapData ? createOsmWorld(scene, mapData) : null;
+  const realWorld = streamed?.world ?? (mapData ? createOsmWorld(scene, mapData) : null);
   const world = realWorld ?? createWorld(scene);
   const pickup = realWorld?.pickup ?? PICKUP;
   const dropoff = realWorld?.dropoff ?? DROPOFF;
@@ -111,17 +121,18 @@ try {
   const tea = realWorld ? realWorld.tea : TEA_STOP;
   const surface = realWorld ?? {roadSurface:onRoad, isBlocked:(x:number,z:number)=>blocked(x,z,world.colliders)};
   if (realWorld) {
-    const compatible = osmRide?.mapId === mapId;
-    car.x = compatible ? osmRide!.x : spawn.x;
-    car.z = compatible ? osmRide!.z : spawn.z;
-    car.heading = compatible ? osmRide!.heading : spawn.heading;
-    progress.phase = osmRide?.phase ?? 'pickup';
+    const ride = isExport ? exportRide : osmRide;
+    const compatible = ride?.mapId === mapId;
+    car.x = compatible ? ride!.x : spawn.x;
+    car.z = compatible ? ride!.z : spawn.z;
+    car.heading = compatible ? ride!.heading : spawn.heading;
+    progress.phase = ride?.phase ?? 'pickup';
   }
   element('map-attribution').hidden = !isReal;
-  document.querySelector('.practice-notice')!.textContent = isReal ? 'OSM roads and footprints · approximate buildings and heights · flat terrain.' : 'Fictional practice loop · real map available in the area selector.';
-  document.querySelector('.welcome-eyebrow')!.textContent = isReal ? 'KOTTAKKAL · OPENSTREETMAP EXTRACT' : 'KOTTAKKAL INSPIRED · PRACTICE';
-  document.querySelector('.welcome-footer span:last-child')!.textContent = isReal ? 'OSM GEOMETRY · APPROXIMATE BUILDING MODELS' : 'ORIGINAL FICTIONAL PRACTICE AREA';
-  document.querySelector('.map-heading > span')!.textContent = isReal ? 'KOTTAKKAL · OSM' : 'FICTIONAL PRACTICE LOOP';
+  document.querySelector('.practice-notice')!.textContent = isExport ? 'Road-only export · nearby tiles · 4.8 km initial window, not the whole district.' : isReal ? 'OSM roads and footprints · approximate buildings and heights · flat terrain.' : 'Fictional practice loop · real map available in the area selector.';
+  document.querySelector('.welcome-eyebrow')!.textContent = isExport ? 'MALAPPURAM ROAD EXPORT · NEARBY TILES' : isReal ? 'KOTTAKKAL · OPENSTREETMAP EXTRACT' : 'KOTTAKKAL INSPIRED · PRACTICE';
+  document.querySelector('.welcome-footer span:last-child')!.textContent = isExport ? 'VERIFIED SOURCE ROADS · FLAT TERRAIN' : isReal ? 'OSM GEOMETRY · APPROXIMATE BUILDING MODELS' : 'ORIGINAL FICTIONAL PRACTICE AREA';
+  document.querySelector('.map-heading > span')!.textContent = isExport ? 'MALAPPURAM · ROAD TILES' : isReal ? 'KOTTAKKAL · OSM' : 'FICTIONAL PRACTICE LOOP';
   const rickshaw = createRickshaw();
   scene.add(rickshaw.group);
   if (surface.isBlocked(car.x, car.z)) {
@@ -219,7 +230,7 @@ try {
     started = true; paused = false; document.body.classList.remove('paused'); document.body.classList.add('playing');
     element('start-screen').hidden = true; input.clear(); audio.start();
     if (!storageAvailable) toast('Browser storage is unavailable. This ride will not be saved.');
-    else toast(progress.phase === 'dropoff' ? 'Welcome back! Your passenger is still aboard.' : isReal ? 'Kottakkal road fare · stop in gold and press E to pick up.' : 'Welcome to Kottakkal. Your first passenger is up the road.');
+    else toast(progress.phase === 'dropoff' ? 'Welcome back! Your passenger is still aboard.' : isExport ? 'Malappuram source-road fare · stop in gold and press E.' : isReal ? 'Kottakkal road fare · stop in gold and press E to pick up.' : 'Welcome to Kottakkal. Your first passenger is up the road.');
     save();
     element<HTMLCanvasElement>('game').focus();
   });
@@ -271,8 +282,9 @@ try {
   function minimap(): void {
     const w = map.width, h = map.height;
     const scale = mapData ? Math.min(w / (mapData.bounds.maxX-mapData.bounds.minX+45), h / (mapData.bounds.maxZ-mapData.bounds.minZ+45)) : 0.91;
-    const sx = (x: number) => w / 2 + x * scale;
-    const sz = (z: number) => h / 2 + z * scale;
+    const viewScale = isExport ? 0.12 : scale;
+    const sx = (x: number) => w / 2 + (x - (isExport ? car.x : 0)) * viewScale;
+    const sz = (z: number) => h / 2 + (z - (isExport ? car.z : 0)) * viewScale;
     ctx.clearRect(0, 0, w, h);
     ctx.fillStyle = '#e0e6cf'; ctx.fillRect(0, 0, w, h);
     ctx.fillStyle = '#c7d2b7';
@@ -280,7 +292,7 @@ try {
     if (mapData) {
       ctx.lineJoin = 'round'; ctx.lineCap = 'round';
       for (const road of mapData.roads) {
-        ctx.strokeStyle = '#faf7e8'; ctx.lineWidth = Math.max(1.2,road.width*scale);
+        ctx.strokeStyle = '#faf7e8'; ctx.lineWidth = Math.max(1.2,road.width*viewScale);
         ctx.beginPath(); road.points.forEach((p,i)=> i ? ctx.lineTo(sx(p.x),sz(p.z)) : ctx.moveTo(sx(p.x),sz(p.z))); ctx.stroke();
       }
       if (realWorld?.mission.route.length) {
@@ -309,8 +321,10 @@ try {
     element('trips').textContent = String(progress.trips);
     element('speed').textContent = String(Math.round(Math.abs(car.speed) * 3.6));
     const pickingUp = progress.phase === 'pickup';
-    element('mission-title').textContent = isReal ? pickingUp ? 'Kottakkal road fare' : 'Passenger aboard' : pickingUp ? 'A ride to the market' : 'Next stop: market';
+    element('mission-title').textContent = isExport ? pickingUp ? 'Malappuram road fare' : 'Passenger aboard' : isReal ? pickingUp ? 'Kottakkal road fare' : 'Passenger aboard' : pickingUp ? 'A ride to the market' : 'Next stop: market';
     element('mission-description').textContent = realWorld ? pickingUp ? `Stop at ${realWorld.mission.pickupName}.` : `Follow the map route to ${realWorld.mission.dropoffName}.` : pickingUp ? 'A passenger is waiting outside the bakery. Pull into the gold circle.' : 'Passenger aboard. Follow the loop to the market bus stand and stop in the teal circle.';
+    element('stream-status').hidden = !streamed;
+    if(streamed) {const status=streamed.world.streaming;element('stream-status').textContent=status.error || `${status.resident}/${status.total} road tiles${status.loading ? ' · loading nearby…' : ' · nearby only'}`;}
     element('mission-distance').textContent = `${Math.round(distance())} m away`;
     element('mission-reward').textContent = `₹${FARE} fare`;
     element('location-label').textContent = car.z < -40 ? 'Market Road' : car.x < -45 ? 'Chaya Corner' : car.z > 40 ? 'Palm Avenue' : 'Bakery Road';
@@ -407,7 +421,7 @@ try {
   console.error(error);
   element('loading').hidden = true;
   element('fatal-error').hidden = false;
-  element('fatal-error').textContent = isReal ? 'Unable to load the real Kottakkal map or 3D graphics. Your saved progress is safe. ' : 'Unable to start 3D graphics. Enable hardware acceleration or use a WebGL-capable browser, then reload. ';
+  element('fatal-error').textContent = isExport ? 'Unable to load the uploaded road tiles or 3D graphics. Your saved progress is safe. ' : isReal ? 'Unable to load the real Kottakkal map or 3D graphics. Your saved progress is safe. ' : 'Unable to start 3D graphics. Enable hardware acceleration or use a WebGL-capable browser, then reload. ';
   if (isReal) {
     const fallback = document.createElement('a'); fallback.href = '?world=practice'; fallback.textContent = 'Open the original practice game';
     element('fatal-error').append(fallback);

@@ -19,3 +19,10 @@ test('legacy or damaged ride data cannot become an invalid map position', () => 
   assert.equal(readOsmRide(JSON.stringify(newProgress())),null);
   for(const raw of ['bad','null','{}', JSON.stringify({osmRide:{...ride,x:'bad'}}),JSON.stringify({osmRide:{...ride,mapId:'wrong'}})]) assert.equal(readOsmRide(raw),null);
 });
+test('uploaded-road ride retains its pose without replacing either older ride',()=>{
+  const uploaded={...ride,mapId:'b'.repeat(64),x:1600,z:-1400};
+  const raw=serializeRouteProgress({...newProgress(),money:360},pose,ride,uploaded);
+  assert.deepEqual(readOsmRide(raw),ride);
+  assert.deepEqual(readOsmRide(raw,'exportRide'),uploaded);
+  assert.equal(parseProgress(raw).phase,pose.phase);assert.equal(parseProgress(raw).money,360);
+});

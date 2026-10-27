@@ -35,9 +35,10 @@ test('production HTML, hashed bundles, geographic data and license notice are pu
   expect(map.buildings.length).toBe(203);
   expect(await (await request.get('/maps/NOTICE.txt')).text()).toContain('OpenStreetMap contributors');
   expect(files).not.toContain('map.osm');
+  expect(files).not.toContain('export.osm');
 });
 
-for (const mode of ['osm', 'practice'] as const) {
+for (const mode of ['osm', 'practice', 'malappuram'] as const) {
   test(`compiled ${mode} game loads, drives, saves and reloads without failed local assets`, async ({ page }) => {
     const errors: string[] = [];
     const failedAssets: string[] = [];
@@ -54,7 +55,7 @@ for (const mode of ['osm', 'practice'] as const) {
     await page.locator('#start-button').click();
     await expect(page.locator('#fatal-error')).toBeHidden();
     await expect(page.locator('#start-screen')).toBeHidden();
-    await expect(page.locator('#mission-title')).toHaveText(mode === 'osm' ? 'Kottakkal road fare' : 'A ride to the market');
+    await expect(page.locator('#mission-title')).toHaveText(mode === 'malappuram' ? 'Malappuram road fare' : mode === 'osm' ? 'Kottakkal road fare' : 'A ride to the market');
     if (mode === 'osm') await expect(page.locator('#map-attribution')).toBeVisible();
     await page.keyboard.down('KeyW');
     await expect.poll(async () => Number(await page.locator('#speed').textContent())).toBeGreaterThan(8);

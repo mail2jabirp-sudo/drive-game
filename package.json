@@ -11,10 +11,11 @@
     "test": "tsx --test tests/*.test.ts",
     "test:browser": "playwright test",
     "map:import": "python3 scripts/import_osm.py",
-    "map:check": "python3 scripts/check_map.py",
+    "map:check": "python3 scripts/check_map.py && python3 scripts/check_export.py",
     "prebuild": "npm run map:check",
     "predev": "npm run map:check",
-    "test:production": "playwright test --config playwright.production.config.ts"
+    "test:production": "playwright test --config playwright.production.config.ts",
+    "map:export": "python3 scripts/import_export_roads.py"
   },
   "dependencies": {
     "three": "^0.180.0"

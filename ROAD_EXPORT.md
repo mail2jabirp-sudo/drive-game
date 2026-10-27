@@ -32,7 +32,7 @@ The exact integrated names, source identities, class counts, one-way counts, bou
 
 ## Streaming and performance
 
-`public/maps/malappuram/manifest.json` is about12KB. Road tile payloads total about605KB; the largest is19,775bytes. The browser fetches the manifest and at most a **3×3 nearby window of 600m tiles**, not the 52MB raw XML or the entire tile set. The source export is outside public and is not copied to dist.
+`public/maps/malappuram/manifest.json` is about12KB. Road tile payloads total about605KB; the largest is19,775bytes. The browser fetches the manifest and at most a **3×3 nearby window of 600m tiles**, not the 52MB raw XML or the entire tile set. The source export is outside public and is not copied to dist. A small origin window selects the connected mission first; near a cell boundary the chase camera may request the adjacent missing tiles, while the resident window remains at most9.
 
 Tile SHA-256 is verified before use. Resident JSON is bounded to9tiles; distant renderer geometry/materials/textures are disposed when the local window is rebuilt. Mesh batches within the current window also cull by distance. The next window is prepared before replacing the old one; failed downloads retain existing roads, report status and retry with a delay. Movement is blocked into unloaded tiles. A temporary old/new window during replacement is bounded, not unbounded preloading. The current implementation rebuilds the bounded nearby road window when crossing a tile boundary; it is not an unlimited district streamer or a surveyed world simulation.
 

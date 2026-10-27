@@ -6,7 +6,7 @@ import { nearestRoad, pointInPolygon, segmentDistance, selectMissionStops } from
 import type { Collider } from './world';
 
 /** Render a bounded source-data slice, not a fabricated road network or surveyed building model. */
-export function createOsmWorld(scene: THREE.Scene, data: OsmMap): {
+export function createOsmWorld(scene: THREE.Scene, data: OsmMap, missionOverride?: ReturnType<typeof selectMissionStops>): {
   colliders: Collider[];
   update: (elapsed: number, cameraPosition: THREE.Vector3, lowDetail?: boolean) => void;
   dispose: () => void;
@@ -179,7 +179,7 @@ export function createOsmWorld(scene: THREE.Scene, data: OsmMap): {
     label.position.set(landmark.x, building ? Math.min(building.height, 40) + 1.6 : 3.4, landmark.z);
     chunkAt(landmark.x, landmark.z).group.add(label); signs.push(label);
   }
-  const stops = selectMissionStops(data);
+  const stops = missionOverride ?? selectMissionStops(data);
   return {
     colliders, roadSurface, isBlocked, spawn: stops.spawn, pickup: stops.pickup, dropoff: stops.dropoff, tea: null,
     mission: { pickupName: stops.pickupName, dropoffName: stops.dropoffName, route: stops.route }, chunkCount: chunks.size,
