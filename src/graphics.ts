@@ -1,7 +1,7 @@
-export type GraphicsMode = 'auto' | 'low';
+export type GraphicsMode = 'auto' | 'low' | 'medium' | 'high';
 export const DISPLAY_KEY = 'en3d.display.v1';
 export function parseGraphicsMode(raw: string | null): GraphicsMode {
-  return raw === 'low' ? 'low' : 'auto';
+  return raw==='low'||raw==='medium'||raw==='high'?raw:'auto';
 }
 
 /** One-way fallback per Auto session avoids visible resolution/shadow flicker. */

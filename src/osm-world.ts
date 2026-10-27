@@ -28,14 +28,17 @@ export function createOsmWorld(scene: THREE.Scene, data: OsmMap, missionOverride
   const unpaved = townMaterial('#9cb57c');
   const concrete = townMaterial('#c9c6ae');
   const heightAt = (x:number,z:number) => terrain?.heightAt(Math.max(data.bounds.minX,Math.min(data.bounds.maxX,x)),Math.max(data.bounds.minZ,Math.min(data.bounds.maxZ,z))) ?? 0;
-  const wall = townMaterial('#c2c8ae'); wall.vertexColors = true;
+  const wall = townMaterial('#c2c8ae'); wall.vertexColors = true;wall.name='Verified footprint facades';
+  const tiledRoof=townMaterial('#b76545');tiledRoof.side=THREE.DoubleSide;tiledRoof.name='Approximate Kerala tiled roofs';
   const roof = new THREE.MeshStandardMaterial({ color: '#9b9687', roughness: 0.98, vertexColors: true });
-  const windows = new THREE.MeshStandardMaterial({ color: '#526963', roughness: 0.42, metalness: 0.1, side: THREE.DoubleSide });
+  const shopTrim=new THREE.MeshStandardMaterial({color:'#4e7770',roughness:.85,side:THREE.DoubleSide});shopTrim.name='Source-tagged shopfront trim';
+  const windows = new THREE.MeshStandardMaterial({ color: '#608885', roughness: 0.42, metalness: 0.1, side: THREE.DoubleSide });
   const bark=new THREE.MeshStandardMaterial({color:'#77654c',roughness:1});bark.name='Decorative palm trunks';
   const poleMaterial=new THREE.MeshStandardMaterial({color:'#8d918a',roughness:1});poleMaterial.name='Decorative utility poles';
+  const grass=new THREE.MeshStandardMaterial({color:'#81925d',side:THREE.DoubleSide,roughness:1});grass.name='Decorative grass';
   const leaves=new THREE.MeshStandardMaterial({color:'#3e7046',roughness:1,side:THREE.DoubleSide});leaves.name='Decorative palm crowns';
   const roadPaint = new THREE.MeshStandardMaterial({ color: '#d2ccaf', roughness: 1 });
-  const waterMaterial = new THREE.MeshStandardMaterial({ color: '#708e85', roughness: 0.35, metalness: 0.1, side: THREE.DoubleSide });
+  const waterMaterial = new THREE.MeshStandardMaterial({ color: '#5f9290', roughness: 0.35, metalness: 0.1, side: THREE.DoubleSide });
   const centerX=(data.bounds.minX+data.bounds.maxX)/2,centerZ=(data.bounds.minZ+data.bounds.maxZ)/2;
   // A nearby flat patch avoids huge-triangle depth precision hiding roads far from the origin.
   const groundWidth=terrain?data.bounds.maxX-data.bounds.minX+20:Math.min(2400,data.bounds.maxX-data.bounds.minX+20);
@@ -150,14 +153,38 @@ export function createOsmWorld(scene: THREE.Scene, data: OsmMap, missionOverride
     colliders.push(bounds); register(buildingCells, building, bounds);
     const center = { x: (bounds.minX + bounds.maxX) / 2, z: (bounds.minZ + bounds.maxZ) / 2 };
     const height = Math.max(2.5, Math.min(40, building.height));
+    const ring=building.points.filter((p,i,list)=>i!==list.length-1||Math.hypot(p.x-list[0].x,p.z-list[0].z)>.02);
+    const convex=ring.length===4&&ring.every((p,i)=>{const b=ring[(i+1)%4],c=ring[(i+2)%4],first=ring[1],second=ring[2];return ((b.x-p.x)*(c.z-b.z)-(b.z-p.z)*(c.x-b.x))*((first.x-ring[0].x)*(second.z-first.z)-(first.z-ring[0].z)*(second.x-first.x))>0;});
+    // Approximate Kerala roof treatment within the verified footprint and total
+    // height. Not a claim that an unmapped roof shape was surveyed.
+    const pitched=convex&&height<=10&&(bounds.maxX-bounds.minX)<23&&(bounds.maxZ-bounds.minZ)<23&&building.tags['roof:shape']!=='flat'&&(building.tags['roof:shape']||['house','residential','yes'].includes(building.kind));
+    const rise=pitched?Math.min(2,height*.24):0,wallHeight=height-rise;
+
     const shape = new THREE.Shape(building.points.map(p => new THREE.Vector2(p.x, -p.z)));
-    const geometry = new THREE.ExtrudeGeometry(shape, { depth: height, bevelEnabled: false, steps: 1 });
+    const geometry = new THREE.ExtrudeGeometry(shape, { depth: wallHeight, bevelEnabled: false, steps: 1 });
     geometry.rotateX(-Math.PI / 2);
     const uv = geometry.getAttribute('uv'); for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) / 4, uv.getY(i) / 4);
     const hash = [...building.id].reduce((sum, char) => sum + char.charCodeAt(0), 0);
-    const tint = new THREE.Color(['#d8cbb7', '#c7c7b7', '#b9c7be', '#d3bfb0'][hash % 4]);
+    const tint = new THREE.Color(['#e9d9bb','#c6d8cf','#e1d5c6','#d8c1ab','#d5dccc'][hash%5]);
     addGeometry(geometry, wall, center, false, tint);
-    addGeometry(flatShape(building.points, height + 0.025), roof, center, false, new THREE.Color(hash % 4 === 0 ? '#a77a5f' : '#c4c2b3'));
+    if(pitched){
+      const positions:number[]=[],uv:number[]=[];
+      for(let i=0;i<ring.length;i++){const a=ring[i],b=ring[(i+1)%ring.length];positions.push(a.x,wallHeight+.025,a.z,b.x,wallHeight+.025,b.z,ring.reduce((sum,p)=>sum+p.x,0)/ring.length,height+.025,ring.reduce((sum,p)=>sum+p.z,0)/ring.length);uv.push(0,0,Math.hypot(b.x-a.x,b.z-a.z)/2,0,.5,rise/2);}
+      const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));g.setAttribute('uv',new THREE.Float32BufferAttribute(uv,2));g.computeVertexNormals();addGeometry(g,tiledRoof,center);
+    }else addGeometry(flatShape(building.points,height+.025),roof,center,false,new THREE.Color(hash%4===0?'#a77a5f':'#c4c2b3'));
+
+    if(building.tags.shop||['retail','commercial'].includes(building.kind)){
+      const faces=ring.map((a,i)=>{const b=ring[(i+1)%ring.length],middle={x:(a.x+b.x)/2,z:(a.z+b.z)/2},match=nearestRoad(data.roads,middle)!;return {a,b,middle,match,length:Math.hypot(b.x-a.x,b.z-a.z)};}).filter(f=>f.length>2).sort((a,b)=>a.match.distance-b.match.distance);
+      const face=faces[0];
+      if(face&&face.match.distance<40){
+        const dx=(face.b.x-face.a.x)/face.length,dz=(face.b.z-face.a.z)/face.length,w=Math.min(6,face.length*.85),m=face.middle;
+        const side=pointInPolygon({x:m.x+dz*.05,z:m.z-dx*.05},ring)?-1:1,ox=dz*.035*side,oz=-dx*.035*side;
+        const lintel=Math.min(2.7,wallHeight-.1);
+        const positions=[m.x-dx*w/2+ox,lintel-.4,m.z-dz*w/2+oz,m.x+dx*w/2+ox,lintel-.4,m.z+dz*w/2+oz,m.x-dx*w/2+ox,lintel,m.z-dz*w/2+oz,m.x-dx*w/2+ox,lintel,m.z-dz*w/2+oz,m.x+dx*w/2+ox,lintel-.4,m.z+dz*w/2+oz,m.x+dx*w/2+ox,lintel,m.z+dz*w/2+oz];
+        const band=new THREE.BufferGeometry();band.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));band.computeVertexNormals();addGeometry(band,shopTrim,center);
+        if(face.match.distance>face.match.road.width/2+1.2)addGeometry(lineQuad({x:m.x-dx*w/2,z:m.z-dz*w/2},{x:m.x+dx*w/2,z:m.z+dz*w/2},.65,lintel+.05),shopTrim,center);
+      }
+    }
     if (nearestRoad(data.roads, center)!.distance < 45) {
       const positions: number[] = [];
       for (let i = 0; i < building.points.length; i++) {
@@ -165,7 +192,7 @@ export function createOsmWorld(scene: THREE.Scene, data: OsmMap, missionOverride
         const length = Math.hypot(b.x - a.x, b.z - a.z); if (length < 3) continue;
         const dx = (b.x - a.x) / length, dz = (b.z - a.z) / length;
         const normalSign = pointInPolygon({ x: (a.x + b.x) / 2 + dz * 0.05, z: (a.z + b.z) / 2 - dx * 0.05 }, building.points) ? -1 : 1;
-        for (let y = 1.5; y < height - 0.6; y += 3) for (let d = 1.8; d < length - 0.8; d += 3.6) {
+        for (let y = 1.5; y < wallHeight - 0.6; y += 3) for (let d = 1.8; d < length - 0.8; d += 3.6) {
           const cx = a.x + dx * d, cz = a.z + dz * d, ox = dz * 0.025 * normalSign, oz = -dx * 0.025 * normalSign;
           positions.push(cx - dx * 0.6 + ox, y, cz - dz * 0.6 + oz, cx + dx * 0.6 + ox, y, cz + dz * 0.6 + oz, cx - dx * 0.6 + ox, y + 1.2, cz - dz * 0.6 + oz,
             cx - dx * 0.6 + ox, y + 1.2, cz - dz * 0.6 + oz, cx + dx * 0.6 + ox, y, cz + dz * 0.6 + oz, cx + dx * 0.6 + ox, y + 1.2, cz + dz * 0.6 + oz);
@@ -208,9 +235,22 @@ export function createOsmWorld(scene: THREE.Scene, data: OsmMap, missionOverride
         if(p.x<data.bounds.minX||p.x>data.bounds.maxX||p.z<data.bounds.minZ||p.z>data.bounds.maxZ||isBlocked(p.x,p.z,3)||nearestRoad(data.roads,p)!.distance<5||planted.some(q=>Math.hypot(p.x-q.x,p.z-q.z)<18))continue;
         if(data.water.some(w=>w.kind==='area'?pointInPolygon(p,w.points):w.points.some((q,j)=>j>0&&segmentDistance(p,w.points[j-1],q).distance<7)))continue;
         planted.push(p);treeCount++;
+        if(treeCount%3===0){
+          const positions:number[]=[],base=heightAt(p.x,p.z);
+          for(let blade=0;blade<5;blade++){const a=blade*2.4+hash,x=p.x+Math.cos(a)*.8,z=p.z+Math.sin(a)*.8;positions.push(x-.08,base,z,x+.08,base,z,x+.12,base+.35,z+.12);}
+          const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));g.computeVertexNormals();addGeometry(g,grass,p);
+        }
         if(treeCount%5===0){
           const base=heightAt(p.x,p.z),pole=new THREE.CylinderGeometry(.12,.18,6,5);pole.translate(p.x,base+3,p.z);addGeometry(pole,poleMaterial,p);
           const arm=new THREE.BoxGeometry(1.7,.12,.13);arm.translate(p.x,base+5.5,p.z);addGeometry(arm,poleMaterial,p);continue;
+        }
+        if(treeCount%4===0){
+          const base=heightAt(p.x,p.z),stem=new THREE.CylinderGeometry(.10,.2,2.2,5);stem.translate(p.x,base+1.1,p.z);addGeometry(stem,leaves,p);
+          const positions:number[]=[];
+          for(let n=0;n<6;n++){const a=n*Math.PI/3+hash,dx=Math.cos(a),dz=Math.sin(a),nx=-dz,nz=dx;
+            positions.push(p.x,base+2,p.z,p.x+dx+nx*.4,base+2.6,p.z+dz+nz*.4,p.x+dx*2.2,base+1.8,p.z+dz*2.2,p.x,base+2,p.z,p.x+dx*2.2,base+1.8,p.z+dz*2.2,p.x+dx-nx*.4,base+2.6,p.z+dz-nz*.4);
+          }
+          const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));g.computeVertexNormals();addGeometry(g,leaves,p);continue;
         }
         const h=5.5+(hash%4)*.6,base=heightAt(p.x,p.z);
         const trunk=new THREE.CylinderGeometry(.13,.23,h,5);trunk.translate(p.x,base+h/2,p.z);addGeometry(trunk,bark,p);
@@ -228,7 +268,7 @@ export function createOsmWorld(scene: THREE.Scene, data: OsmMap, missionOverride
   for (const chunk of chunks.values()) for (const batch of chunk.batches.values()) {
     const geometry = mergeGeometries(batch.geometries, false);
     if (!geometry) throw new Error('Unable to combine OSM geometry.');
-    const mesh = new THREE.Mesh(geometry, batch.material); mesh.receiveShadow = true; mesh.castShadow = batch.material === wall;
+    const mesh = new THREE.Mesh(geometry, batch.material); mesh.receiveShadow = true; mesh.castShadow = batch.material === wall||batch.material===tiledRoof;
     chunk.group.add(mesh); if (batch.detail) chunk.detail.push(mesh);
     for (const geometry of batch.geometries) geometry.dispose(); batch.geometries.length = 0;
   }
@@ -256,7 +296,7 @@ export function createOsmWorld(scene: THREE.Scene, data: OsmMap, missionOverride
       for (const chunk of chunks.values()) {
         const distance = Math.hypot(cameraPosition.x - chunk.x, cameraPosition.z - chunk.z);
         chunk.group.visible = distance < (lowDetail ? 220 : 330) + chunk.radius;
-        for (const detail of chunk.detail) detail.visible = !lowDetail && distance < 205;
+        for (const detail of chunk.detail) detail.visible = lowDetail?distance<110:distance<205;
       }
       for (const sign of signs){
         const distance=Math.hypot(cameraPosition.x-sign.position.x,cameraPosition.z-sign.position.z);

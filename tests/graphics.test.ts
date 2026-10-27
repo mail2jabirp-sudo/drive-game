@@ -24,3 +24,7 @@ test('Battery saver is immediately active and switching back retries standard', 
   budget.setMode('auto'); assert.equal(budget.lowDetail, false);
   budget.setMode('low'); assert.equal(budget.lowDetail, true);
 });
+
+test('explicit Medium and High selections persist and do not use Auto fallback',()=>{
+ for(const mode of ['medium','high'] as const){assert.equal(parseGraphicsMode(mode),mode);const budget=new GraphicsBudget(mode);for(let n=0;n<15;n++)budget.observeFrame(.1);assert.equal(budget.lowDetail,false);assert.equal(budget.mode,mode);}
+});

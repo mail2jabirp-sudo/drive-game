@@ -1,14 +1,15 @@
 import * as THREE from 'three';
+import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
 
 /** All geometry is made here; no external models, textures, or paid assets. */
 export function createRickshaw(): {
   group: THREE.Group;
-  animate: (speed: number, steering: number, elapsed: number) => void;
+  animate: (speed: number, steering: number, elapsed: number, braking?:boolean) => void;
 } {
   const group = new THREE.Group();
   group.name = 'Kottakkal auto-rickshaw';
   const yellow = new THREE.MeshStandardMaterial({ color: '#f5bc28', roughness: 0.48 });
-  const charcoal = new THREE.MeshStandardMaterial({ color: '#182c2c', roughness: 0.73 });
+  const charcoal = new THREE.MeshStandardMaterial({ color: '#15211e', roughness: 0.53 });
   const rubber = new THREE.MeshStandardMaterial({ color: '#151f22', roughness: 0.97 });
   const chrome = new THREE.MeshStandardMaterial({ color: '#c0d1c7', metalness: 0.65, roughness: 0.28 });
   const seat = new THREE.MeshStandardMaterial({ color: '#5a3930', roughness: 0.92 });
@@ -22,6 +23,7 @@ export function createRickshaw(): {
   const tailLamp = new THREE.MeshStandardMaterial({
     color: '#dd5040', emissive: '#a62a19', emissiveIntensity: 0.45,
   });
+  tailLamp.name='Autorickshaw brake lights';
   const amber = new THREE.MeshStandardMaterial({ color: '#ff841a', emissive: '#f77012', emissiveIntensity: 0.3 });
 
   function box(
@@ -123,10 +125,11 @@ export function createRickshaw(): {
 
   const wheelMeshes: THREE.Group[] = [];
   const frontSteering = new THREE.Group();
+  frontSteering.name='Front steering fork';
   frontSteering.position.set(0, 0.34, -1.15);
   group.add(frontSteering);
   function wheel(parent: THREE.Object3D, x: number, y: number, z: number): void {
-    const wheelGroup = new THREE.Group();
+    const wheelGroup = new THREE.Group();wheelGroup.name='Rolling wheel';
     wheelGroup.position.set(x, y, z);
     const tyre = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.34, 0.23, 18), rubber);
     tyre.rotation.z = Math.PI / 2;
@@ -172,11 +175,26 @@ export function createRickshaw(): {
     group.add(frontPlate);
   }
 
+  // Batch only static direct children. Wheels, fork and canopy retain their
+  // independent transforms, steering, suspension and rolling animation.
+  for(const parent of [group,cabin]){
+    const batches=new Map<THREE.Material,THREE.Mesh[]>();
+    for(const child of parent.children)if(child instanceof THREE.Mesh&&!Array.isArray(child.material)){const list=batches.get(child.material)??[];list.push(child);batches.set(child.material,list);}
+    const oldGeometry=new Set<THREE.BufferGeometry>();
+    for(const [material,meshes] of batches){if(meshes.length<2)continue;
+      const pieces=meshes.map(mesh=>{mesh.updateMatrix();const g=mesh.geometry.index?mesh.geometry.toNonIndexed():mesh.geometry.clone();g.applyMatrix4(mesh.matrix);oldGeometry.add(mesh.geometry);return g;});
+      const geometry=mergeGeometries(pieces,false);if(!geometry)throw new Error('Vehicle geometry batching failed');
+      const mesh=new THREE.Mesh(geometry,material);mesh.name='Batched autorickshaw body';mesh.castShadow=mesh.receiveShadow=true;parent.add(mesh);
+      for(const old of meshes)parent.remove(old);for(const g of pieces)g.dispose();
+    }
+    for(const g of oldGeometry)g.dispose();
+  }
   let lastElapsed = 0;
   let rotation = 0;
   return {
     group,
-    animate(speed, steering, elapsed) {
+    animate(speed, steering, elapsed, braking=false) {
+      tailLamp.emissiveIntensity=braking?2.2:.45;
       const dt = Math.max(0, Math.min(elapsed - lastElapsed, 0.1));
       lastElapsed = elapsed;
       rotation -= speed * dt / 0.34;
