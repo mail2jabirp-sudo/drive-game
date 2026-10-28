@@ -1,0 +1,9 @@
+Requested verified SRTM/Skadi HGT source:
+https://elevation-tiles-prod.s3.amazonaws.com/skadi/N11/N11E076.hgt.gz
+
+Normal HTTPS HEAD request was denied by the environment proxy:
+HTTP/1.1 403 Forbidden
+curl: (56) CONNECT tunnel failed, response 403
+
+No DEM bytes downloaded; no real-world slopes, elevations or bridge clearances fabricated.
+Full road coverage spans multiple degree tiles and requires a correctly projected, licensed multi-tile DEM pipeline before claiming elevation support for this expanded region.
