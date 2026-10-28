@@ -4,12 +4,18 @@ export async function instrument(page:Page){
  await page.addInitScript(()=>localStorage.setItem('en3d.display.v1','low'));
  await page.route('**/src/main.ts*',async route=>{
   const response=await route.fetch(),source=await response.text();
-  await route.fulfill({response,body:source.replace('renderer.render(scene, camera);','renderer.render(scene, camera); window.__gameTest={THREE,car,streamed,camera,renderer,scene,input,traffic,audio,graphics,rickshaw,fleet,models,get activeVehicle(){return activeVehicle;},foot,character,footBlocked,navigator,get cameraMode(){return cameraMode;},get paused(){return paused;},get navigation(){return {route:navRoute,revision:navRevision};},get elapsed(){return elapsed;},get lastInteraction(){return lastInteraction;}};')});
+  await route.fulfill({response,body:source.replace('renderer.render(scene, camera);','renderer.render(scene, camera); window.__gameTest={THREE,car,streamed,camera,renderer,scene,input,traffic,snapCamera,get cameraTrackingError(){return Math.max(camera.position.distanceTo(desiredCamera),smoothedLook.distanceTo(lookAt),Math.abs(camera.fov-targetFov));},audio,graphics,rickshaw,fleet,models,get activeVehicle(){return activeVehicle;},foot,character,footBlocked,navigator,get cameraMode(){return cameraMode;},get paused(){return paused;},get navigation(){return {route:navRoute,revision:navRevision};},get elapsed(){return elapsed;},get lastInteraction(){return lastInteraction;}};')});
  });
 }
 export async function start(page:Page,path='/'){
  await page.goto(path);await expect(page.locator('#start-button')).toBeEnabled();await page.locator('#start-button').click();
  await expect(page.locator('#fatal-error')).toBeHidden();await expect(page.locator('#start-screen')).toBeHidden();
+}
+/** Wait for measured camera convergence, using the existing assertion timeout. */
+export async function waitForCamera(page:Page){
+ // Let input/pose changes reach the animation loop before reading its targets.
+ await page.evaluate(()=>new Promise<void>(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve()))));
+ await expect.poll(()=>page.evaluate(()=>(window as any).__gameTest.cameraTrackingError)).toBeLessThan(.05);
 }
 export async function stoppedAt(page:Page,point:{x:number;z:number}){
  await page.evaluate(async p=>{const t=(window as any).__gameTest;t.car.speed=0;t.input.clear();await t.streamed.world.refresh(p);Object.assign(t.car,p);t.camera.position.x=p.x;t.camera.position.z=p.z;},point);

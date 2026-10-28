@@ -1,5 +1,5 @@
 import {test,expect} from '@playwright/test';
-import {instrument,start,stoppedAt} from './helpers/game';
+import {instrument,start,stoppedAt,waitForCamera} from './helpers/game';
 import {TRAFFIC} from '../src/traffic-types';
 import {rectanglesOverlap} from '../src/traffic-sim';
 
@@ -49,8 +49,9 @@ test('buses and lorries spawn and render on the verified major road rather than 
  await instrument(page);await start(page);await stoppedAt(page,{x:0,z:0});
  const result=await page.evaluate(()=>{const t=(window as any).__gameTest,sim=t.traffic.sim;sim.clear();sim.hour=12;
   const seen=new Set<string>();for(let i=0;i<1000;i++){sim.update(.05,t.car);for(const a of sim.agents)seen.add(a.kind);if(sim.agents.some((a:any)=>a.kind==='bus')&&sim.agents.some((a:any)=>a.kind==='lorry'))break;}
-  const bus=sim.agents.find((a:any)=>a.kind==='bus');if(bus)t.car.heading=Math.atan2(-(bus.x-t.car.x),-(bus.z-t.car.z));
+  const bus=sim.agents.find((a:any)=>a.kind==='bus');if(bus){t.car.heading=Math.atan2(-(bus.x-t.car.x),-(bus.z-t.car.z));t.snapCamera();}
   return {seen:[...seen],count:sim.agents.length,onRoad:sim.agents.every((a:any)=>t.streamed.world.roadSurface(a.x,a.z))};});
+ await waitForCamera(page);
  expect(result.seen).toContain('bus');expect(result.seen).toContain('lorry');expect(result.count).toBeLessThanOrEqual(6);expect(result.onRoad).toBe(true);
  await expect.poll(()=>page.evaluate(()=>{const s=(window as any).__gameTest.scene;return s.getObjectByName('Traffic bus detailed').count+s.getObjectByName('Traffic bus distant').count;})).toBeGreaterThan(0);
  await expect.poll(()=>page.evaluate(()=>{const s=(window as any).__gameTest.scene;return s.getObjectByName('Traffic lorry detailed').count+s.getObjectByName('Traffic lorry distant').count;})).toBeGreaterThan(0);

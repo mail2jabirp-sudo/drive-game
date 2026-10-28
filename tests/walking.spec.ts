@@ -1,5 +1,5 @@
 import {readFileSync} from 'node:fs';
-import {test,expect} from '@playwright/test';import {instrument,start,interact,stoppedAt} from './helpers/game';
+import {test,expect} from '@playwright/test';import {instrument,start,interact,stoppedAt,waitForCamera} from './helpers/game';
 
 test('exit, walk, run, save, reload and enter preserve the parked auto, passenger and wallet',async({page})=>{
  const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));await instrument(page);await start(page);await interact(page);await expect(page.locator('#mission-title')).toHaveText('Passenger aboard');
@@ -46,8 +46,9 @@ test('off-road walking GPS marks a verified road entry and gives its real distan
  await expect.poll(()=>page.evaluate(()=>(window as any).__gameTest.scene.getObjectByName('GPS verified road entry').visible)).toBe(true);
  await expect(page.locator('#gps-instruction')).toContainText('ring');await expect(page.locator('#gps-distance')).toContainText(/auto|hatchback|taxi|van/);
  const proof=await page.evaluate(()=>{const t=(window as any).__gameTest,p=t.navigation.route.points[0],ring=t.scene.getObjectByName('GPS verified road entry');return {error:Math.hypot(p.x-ring.position.x,p.z-ring.position.z),onRoad:t.streamed.world.roadSurface(p.x,p.z),distance:Math.hypot(t.foot.pose.x-p.x,t.foot.pose.z-p.z)};});expect(proof.error).toBeLessThan(.01);expect(proof.onRoad).toBe(true);expect(proof.distance).toBeGreaterThan(6);
+ await waitForCamera(page);
  for(let n=0;n<8;n++){
-  const inside=await page.evaluate(()=>{const t=(window as any).__gameTest,p=t.scene.getObjectByName('GPS verified road entry').position.clone().project(t.camera);return Math.abs(p.x)<.9&&Math.abs(p.y)<.85&&p.z>0&&p.z<1;});if(inside)break;await page.keyboard.press('KeyC');await page.waitForTimeout(500);
+  const inside=await page.evaluate(()=>{const t=(window as any).__gameTest,p=t.scene.getObjectByName('GPS verified road entry').position.clone().project(t.camera);return Math.abs(p.x)<.9&&Math.abs(p.y)<.85&&p.z>0&&p.z<1;});if(inside)break;await page.keyboard.press('KeyC');await waitForCamera(page);
  }
  expect(await page.evaluate(()=>{const t=(window as any).__gameTest,p=t.scene.getObjectByName('GPS verified road entry').position.clone().project(t.camera);return Math.abs(p.x)<.9&&Math.abs(p.y)<.85&&p.z>0&&p.z<1;})).toBe(true);
  await expect(page.locator('#toast')).not.toHaveClass(/visible/);await page.screenshot({path:'test-results/on-foot-road-entry.png'});
