@@ -16,6 +16,7 @@ export interface OsmRoad {
   tags: Record<string, string>;
 }
 export interface OsmBuilding {
+  renderExcludedReason?:string;
   id: string;
   name: string;
   kind: string;
@@ -32,7 +33,7 @@ export interface OsmLandmark {
   z: number;
   tags: Record<string, string>;
 }
-export interface OsmWater { id: string; kind: 'area' | 'stream'; name: string; points: MapPoint[] }
+export interface OsmWater { width?:number;widthSource?:'tag'|'estimate';tags?:Record<string,string>; id: string; kind: 'area' | 'stream'; name: string; points: MapPoint[] }
 export interface OsmMap {
   version: 1;
   source: { file: string; sha256: string; copyright: string; license: string; upstreamCommit: string };
@@ -42,6 +43,7 @@ export interface OsmMap {
   buildings: OsmBuilding[];
   landmarks: OsmLandmark[];
   water: OsmWater[];
+  landuse?:Array<{id:string;kind:string;name:string;points:MapPoint[];tags:Record<string,string>}>;
   intersections: Array<{ id: string; x: number; z: number; roadIds: string[] }>;
   stats: Record<string, number>;
 }

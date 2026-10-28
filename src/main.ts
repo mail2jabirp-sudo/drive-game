@@ -144,7 +144,7 @@ try {
   }
   element('map-attribution').hidden = !isReal;
   if(streamed?.terrainSource)element('map-attribution').append(document.createTextNode(` · Terrain: ${streamed.terrainSource.attribution}`));
-  document.querySelector('.practice-notice')!.textContent = isExport ? 'Verified roads in a 36 km window · partial coverage, not the full district.' : isReal ? 'OSM roads and footprints · approximate buildings and heights · flat terrain.' : 'Fictional practice loop · real map available in the area selector.';
+  document.querySelector('.practice-notice')!.textContent = isExport ? 'Uploaded OSM road network · partial regional coverage, not the full district.' : isReal ? 'OSM roads and footprints · approximate buildings and heights · flat terrain.' : 'Fictional practice loop · real map available in the area selector.';
   document.querySelector('.welcome-eyebrow')!.textContent = 'THE ROAD FEELS LIKE HOME';
   document.querySelector('.welcome-footer span:first-child')!.textContent = BRAND_TITLE;
   document.querySelector('.welcome-footer span:last-child')!.textContent = SIMULATOR_SUBTITLE;

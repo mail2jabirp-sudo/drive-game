@@ -1,0 +1,218 @@
+{
+  "projection": {
+    "latitude": 11.0544807,
+    "longitude": 76.0863541,
+    "earthRadius": 6371008.8
+  },
+  "previousPlayableBounds": {
+    "minX": -18000,
+    "maxX": 18000,
+    "minZ": -18000,
+    "maxZ": 18000
+  },
+  "previousTiles": 3535,
+  "currentPlayableBounds": {
+    "minX": -49200,
+    "maxX": 49200,
+    "minZ": -49200,
+    "maxZ": 49200
+  },
+  "sources": [
+    {
+      "file": "export.osm",
+      "sha256": "7915b6d48899723c3dd4a88dfd8c3db64d77e0e85e60d9e99511c2bb6b7ac3f2",
+      "bytes": 52112410,
+      "objects": {
+        "nodes": 534348,
+        "ways": 43226
+      },
+      "allNodeBounds": {
+        "minLat": 10.6269746,
+        "maxLat": 11.525987,
+        "minLon": 75.8256662,
+        "maxLon": 76.7019365
+      },
+      "motorRoadBounds": {
+        "minLat": 10.6269746,
+        "maxLat": 11.4861819,
+        "minLon": 75.8256662,
+        "maxLon": 76.4768593
+      },
+      "projectedMotorBounds": {
+        "minX": -28449.36309751574,
+        "maxX": 42616.570336668774,
+        "minZ": -48003.04957091253,
+        "maxZ": 47536.57508982459
+      },
+      "eligibleMotorWays": 39273,
+      "excludedRestrictedWays": 257,
+      "missingNodeMotorWays": 0,
+      "motorLengthKm": 13566.466,
+      "waysNotFullyInsideCurrentWindow": 20381,
+      "waysWithNoVerticesInsideCurrentWindow": 20048,
+      "weakComponents": 182,
+      "largestWeakComponentNodes": 491654,
+      "motorNodes": 496908,
+      "largestWeakComponentBounds": {
+        "minLat": 10.6269746,
+        "maxLat": 11.4861819,
+        "minLon": 75.8256662,
+        "maxLon": 76.4289713
+      },
+      "componentSizesTop10": [
+        491654,
+        393,
+        235,
+        230,
+        211,
+        208,
+        167,
+        156,
+        152,
+        146
+      ],
+      "junctionNodes": 37325,
+      "bridgeWays": 783,
+      "highwayClasses": {
+        "bridleway": 1,
+        "construction": 10,
+        "corridor": 4,
+        "cycleway": 11,
+        "footway": 470,
+        "living_street": 1098,
+        "path": 1145,
+        "pedestrian": 15,
+        "platform": 1,
+        "primary": 258,
+        "primary_link": 11,
+        "proposed": 2,
+        "residential": 17575,
+        "road": 38,
+        "secondary": 786,
+        "secondary_link": 5,
+        "service": 872,
+        "services": 10,
+        "steps": 27,
+        "tertiary": 1332,
+        "tertiary_link": 14,
+        "track": 2000,
+        "trunk": 346,
+        "trunk_link": 42,
+        "unclassified": 17153
+      },
+      "mappedWayFeatures": {},
+      "relationTypes": {},
+      "limitations": [
+        "Weak connectivity is not proof of bidirectional reachability or legal turn access.",
+        "No administrative district boundary validation.",
+        "Lengths follow projected source centre lines, not carriageway counts."
+      ]
+    },
+    {
+      "file": "map.osm",
+      "sha256": "d7ef65eeb57978269dcbb2404fe32120f93e42f795bbb0ef96c1bb08f49d4add",
+      "bytes": 12921889,
+      "objects": {
+        "nodes": 54513,
+        "ways": 7188,
+        "relations": 173
+      },
+      "allNodeBounds": {
+        "minLat": 10.7651111,
+        "maxLat": 11.4436553,
+        "minLon": 75.8818387,
+        "maxLon": 76.1033108
+      },
+      "motorRoadBounds": {
+        "minLat": 10.9397549,
+        "maxLat": 11.0512521,
+        "minLon": 75.9404976,
+        "maxLon": 76.0927025
+      },
+      "projectedMotorBounds": {
+        "minX": -15917.595441264157,
+        "maxX": 692.8128873203658,
+        "minZ": 359.0044360419749,
+        "maxZ": 12756.9445358561
+      },
+      "eligibleMotorWays": 1509,
+      "excludedRestrictedWays": 18,
+      "missingNodeMotorWays": 0,
+      "motorLengthKm": 501.225,
+      "waysNotFullyInsideCurrentWindow": 0,
+      "waysWithNoVerticesInsideCurrentWindow": 0,
+      "weakComponents": 14,
+      "largestWeakComponentNodes": 18764,
+      "motorNodes": 19095,
+      "largestWeakComponentBounds": {
+        "minLat": 10.9397549,
+        "maxLat": 11.0512521,
+        "minLon": 75.9404976,
+        "maxLon": 76.0927025
+      },
+      "componentSizesTop10": [
+        18764,
+        148,
+        57,
+        24,
+        19,
+        18,
+        17,
+        16,
+        7,
+        6
+      ],
+      "junctionNodes": 1377,
+      "bridgeWays": 41,
+      "highwayClasses": {
+        "cycleway": 1,
+        "footway": 12,
+        "living_street": 65,
+        "path": 26,
+        "primary": 47,
+        "primary_link": 4,
+        "residential": 576,
+        "road": 1,
+        "secondary": 57,
+        "service": 46,
+        "services": 1,
+        "steps": 1,
+        "tertiary": 42,
+        "track": 86,
+        "trunk": 22,
+        "trunk_link": 3,
+        "unclassified": 664
+      },
+      "mappedWayFeatures": {
+        "buildingWays": 4673,
+        "landuse:brownfield": 1,
+        "landuse:cemetery": 1,
+        "landuse:commercial": 6,
+        "landuse:farmland": 53,
+        "landuse:farmyard": 6,
+        "landuse:grass": 1,
+        "landuse:greenfield": 4,
+        "landuse:industrial": 3,
+        "landuse:landfill": 2,
+        "landuse:plant_nursery": 1,
+        "landuse:recreation_ground": 23,
+        "landuse:religious": 4,
+        "landuse:residential": 24,
+        "landuse:retail": 6,
+        "waterAreaWays": 114,
+        "waterwayWays": 91
+      },
+      "relationTypes": {
+        "route": 19,
+        "boundary": 150,
+        "multipolygon": 3,
+        "superroute": 1
+      },
+      "limitations": [
+        "Weak connectivity is not proof of bidirectional reachability or legal turn access.",
+        "No administrative district boundary validation.",
+        "Lengths follow projected source centre lines, not carriageway counts."
+      ]
+    }
+  ]
+}

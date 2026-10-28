@@ -1,0 +1,155 @@
+{
+  "sourceSha256": "7915b6d48899723c3dd4a88dfd8c3db64d77e0e85e60d9e99511c2bb6b7ac3f2",
+  "projection": {
+    "latitude": 11.0544807,
+    "longitude": 76.0863541,
+    "earthRadius": 6371008.8
+  },
+  "teaStop": {
+    "x": -8399.586,
+    "z": 5707.629,
+    "name": "Near New galaxy coolbar",
+    "source": "Authored game stop on source way 381689700 near map.osm landmark node/8898331062"
+  },
+  "note": "Preserved existing authored game stop near a verified map.osm cafe; not a surveyed entrance or parking bay.",
+  "missionStopsBaseline": [
+    {
+      "origin": {
+        "id": "3950629511",
+        "x": -8904.737,
+        "z": 6004.545,
+        "name": "Kottakkal",
+        "nameMl": "കോട്ടക്കല്‍",
+        "source": "map.osm node 3950629511"
+      },
+      "mission": {
+        "spawn": {
+          "x": -8878.93195974512,
+          "z": 5944.024938092935,
+          "heading": -1.516184765728268
+        },
+        "pickup": {
+          "x": -8878.93195974512,
+          "z": 5944.024938092935
+        },
+        "dropoff": {
+          "x": -8604.687,
+          "z": 6000
+        },
+        "pickupName": "Kottakkal bus stand road stop",
+        "dropoffName": "Police station road stop",
+        "route": [
+          {
+            "x": -8878.861,
+            "z": 5945.323
+          },
+          {
+            "x": -8836.147,
+            "z": 5942.988
+          },
+          {
+            "x": -8805.077,
+            "z": 5940.052
+          },
+          {
+            "x": -8769.577,
+            "z": 5936.694
+          },
+          {
+            "x": -8722.868,
+            "z": 5928.321
+          },
+          {
+            "x": -8698.75,
+            "z": 5923.162
+          },
+          {
+            "x": -8674.512,
+            "z": 5916.212
+          },
+          {
+            "x": -8659.103,
+            "z": 5909.551
+          },
+          {
+            "x": -8632.311,
+            "z": 5954.074
+          },
+          {
+            "x": -8604.687,
+            "z": 6000
+          }
+        ]
+      }
+    },
+    {
+      "origin": {
+        "x": 0,
+        "z": 0
+      },
+      "mission": {
+        "spawn": {
+          "x": -66.03607366252724,
+          "z": 256.0606582579487,
+          "heading": 1.3936609414743457
+        },
+        "pickup": {
+          "x": -66.03607366252724,
+          "z": 256.0606582579487
+        },
+        "dropoff": {
+          "x": -192.269,
+          "z": 242.483
+        },
+        "pickupName": "Town road stop",
+        "dropoffName": "Town road stop",
+        "route": [
+          {
+            "x": -65.807,
+            "z": 254.781
+          },
+          {
+            "x": -74.002,
+            "z": 253.314
+          },
+          {
+            "x": -96.549,
+            "z": 254.781
+          },
+          {
+            "x": -113.235,
+            "z": 260.052
+          },
+          {
+            "x": -144.556,
+            "z": 278.488
+          },
+          {
+            "x": -159.191,
+            "z": 285.227
+          },
+          {
+            "x": -167.965,
+            "z": 285.227
+          },
+          {
+            "x": -173.531,
+            "z": 282.291
+          },
+          {
+            "x": -178.212,
+            "z": 275.263
+          },
+          {
+            "x": -183.189,
+            "z": 262.976
+          },
+          {
+            "x": -192.269,
+            "z": 242.483
+          }
+        ]
+      }
+    }
+  ]
+}

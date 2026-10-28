@@ -50,7 +50,7 @@ test('all eight original traffic prototypes have bounded render geometry and cat
  for(const kind of Object.keys(TRAFFIC) as TrafficKind[]){const g=trafficBody(kind);assert.ok(g.getAttribute('position').count/3<12000,kind);assert.ok(g.getAttribute('color'));const expected=kind==='bike'||kind==='scooter'?2:kind==='auto'||kind==='pickup'?3:kind==='lorry'?6:4;assert.equal(wheelOffsets(kind).length,expected);g.dispose();}
 });
 test('mapped signals and crossings reproduce from the unchanged uploaded OSM source',()=>{
- execFileSync('python3',['scripts/import_traffic_controls.py','--check'],{stdio:'pipe'});const data=JSON.parse(readFileSync('public/maps/district/traffic-controls.json','utf8'));assert.equal(data.controls.length,48);assert.ok(data.controls.some((c:any)=>c.kind==='traffic_signals'));assert.ok(data.controls.some((c:any)=>c.kind==='crossing'));
+ execFileSync('python3',['scripts/import_traffic_controls.py','--check'],{stdio:'pipe'});const data=JSON.parse(readFileSync('public/maps/district/traffic-controls.json','utf8'));assert.equal(data.controls.length,106);assert.ok(data.controls.some((c:any)=>c.kind==='traffic_signals'));assert.ok(data.controls.some((c:any)=>c.kind==='crossing'));
 });
 
 test('traffic footprint collision rejects enclosed and edge-crossing buildings without AABB false walls',async()=>{

@@ -1,0 +1,19 @@
+{
+  "sourceWayId": "167057069",
+  "name": "Chamravattom Regulator-cum-Bridge",
+  "a": {
+    "x": -13419.305,
+    "z": 26127.519
+  },
+  "b": {
+    "x": -14345.616,
+    "z": 26020.016
+  },
+  "length": 932.5287857425161,
+  "nodeIds": [
+    "6083965241",
+    "1682963691"
+  ],
+  "sourceSha256": "7915b6d48899723c3dd4a88dfd8c3db64d77e0e85e60d9e99511c2bb6b7ac3f2",
+  "description": "Verified original OSM node pair on a long source-tagged bridge, beyond the former playable bounds. Water geometry is not present here in the supplied auxiliary extract."
+}

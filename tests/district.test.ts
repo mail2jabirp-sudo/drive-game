@@ -17,11 +17,13 @@ test('unified map reproducibly expands verified source roads while preserving ar
   execFileSync('python3',['scripts/import_district.py','--output',temp,'--provenance',temp+'/provenance.json'],{stdio:'pipe'});
   for(const file of ['manifest.json','NOTICE.txt',...Object.values(m.tiles).map(t=>t.file)])assert.deepEqual(readFileSync(temp+'/'+file),readFileSync('public/maps/district/'+file),file);
  }finally{rmSync(temp,{recursive:true,force:true});}
- assert.equal((m as any).coverageComplete,false);assert.equal(Object.keys(m.tiles).length,3535);
- assert.ok(m.stats.integratedWays>19000);assert.equal(m.source.sha256,createHash('sha256').update(readFileSync('export.osm')).digest('hex'));
+ assert.equal((m as any).coverageComplete,false);assert.equal(Object.keys(m.tiles).length,8315);
+ assert.equal(m.stats.integratedWays,39273);assert.equal(m.source.sha256,createHash('sha256').update(readFileSync('export.osm')).digest('hex'));
  assert.equal(m.legacySourceHash,createHash('sha256').update(readFileSync('map.osm')).digest('hex'));
- assert.equal(tiles.reduce((n,t)=>n+(t.buildings?.length??0),0),203);
- assert.equal(tiles.reduce((n,t)=>n+(t.water?.length??0),0),4);
+ assert.equal(new Set(tiles.flatMap(t=>(t.buildings??[]).map(b=>b.id))).size,4673);
+ assert.equal(new Set(tiles.flatMap(t=>(t.landmarks??[]).map(b=>b.id))).size,584);
+ assert.equal(new Set(tiles.flatMap(t=>(t.landuse??[]).map(b=>b.id))).size,65);
+ assert.equal(new Set(tiles.flatMap(t=>(t.water??[]).map(b=>b.id))).size,205);
 });
 
 test('Kottakkal uses verified bilingual place coordinates in the same connected drivable road graph',()=>{

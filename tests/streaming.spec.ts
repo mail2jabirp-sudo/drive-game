@@ -71,8 +71,8 @@ test('missing DEM offers the existing flat map without erasing saved progress',a
 
 test('synthetic test-only terrain keeps vehicle contact, camera, missions and bounded streaming working',async({page})=>{
   // Explicit synthetic plane response only in this test; no geographic elevation artifact is generated.
-  const b=manifest.bounds,plane=(x:number,z:number)=>1000+x*0.02+z*0.03;
-  const fixture={version:1,projection:manifest.projection,bounds:b,columns:2,rows:2,originElevation:1000,
+  const b=manifest.bounds,plane=(x:number,z:number)=>3000+x*0.02+z*0.03;
+  const fixture={version:1,projection:manifest.projection,bounds:b,columns:2,rows:2,originElevation:3000,
     heights:[plane(b.minX,b.minZ),plane(b.maxX,b.minZ),plane(b.minX,b.maxZ),plane(b.maxX,b.maxZ)],
     source:{url:'synthetic-test-only',sha256:'synthetic-test-only',tile:'N11E076',datum:'test metres',attribution:'TEST ONLY: not Kerala DEM'}};
   const errors:string[]=[];page.on('pageerror',error=>errors.push(error.message));

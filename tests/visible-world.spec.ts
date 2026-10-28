@@ -14,7 +14,7 @@ test('fresh gameplay visibly contains nearby moving traffic, mapped buildings an
   return {visible,onRoad:t.streamed.world.roadSurface(t.car.x,t.car.z),buildings:t.streamed.data.buildings.length,palms,buildingBatches,calls:t.renderer.info.render.calls,triangles:t.renderer.info.render.triangles,car:{...t.car},resident:t.streamed.world.streaming.resident};
  });
  await expect.poll(async()=>(await probe()).visible.length).toBeGreaterThanOrEqual(2);
- const before=await probe();expect(before.onRoad).toBe(true);expect(before.buildings).toBe(203);expect(before.palms).toBeGreaterThan(0);expect(before.buildingBatches).toBeGreaterThan(0);expect(before.resident).toBeLessThanOrEqual(9);
+ const before=await probe();expect(before.onRoad).toBe(true);expect(before.buildings).toBeGreaterThan(203);expect(before.palms).toBeGreaterThan(0);expect(before.buildingBatches).toBeGreaterThan(0);expect(before.resident).toBeLessThanOrEqual(9);
  await expect.poll(async()=>{const now=await probe();return now.visible.some(a=>before.visible.some(b=>a.id===b.id&&Math.hypot(a.x-b.x,a.z-b.z)>1));}).toBe(true);
  await page.screenshot({path:'test-results/visible-world-gameplay.png'});
  console.log('Visible gameplay evidence:',JSON.stringify(await probe()));expect(before.calls).toBeLessThan(350);expect(before.triangles).toBeLessThan(200000);

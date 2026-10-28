@@ -7,7 +7,7 @@ ROOT=Path(__file__).resolve().parents[1]
 SOURCE=ROOT/'export.osm'; OUT=ROOT/'public/maps/malappuram'
 R=6371008.8; EXTENT=2400; SIZE=600; ORIGIN_WAY='169318337'
 def encode(value): return (json.dumps(value,ensure_ascii=False,separators=(',',':'),allow_nan=False)+'\n').encode()
-def generate(output=OUT, provenance_path=None, extent=EXTENT):
+def generate(output=OUT, provenance_path=None, extent=EXTENT, full_source=False, width_defaults=None):
     if extent<2400 or extent%SIZE:raise ValueError("Extent must be a multiple of 600m, at least 2400m")
     OUT=output
     digest=hashlib.sha256(); size=0
@@ -42,11 +42,15 @@ def generate(output=OUT, provenance_path=None, extent=EXTENT):
     anchor_id=anchor[1][len(anchor[1])//2];lat0,lon0=nodes[anchor_id]
     def project(ref):
         lat,lon=nodes[ref]; return point(R*math.cos(math.radians(lat0))*math.radians(lon-lon0),-R*math.radians(lat-lat0))
+    if full_source:
+        eligible_refs={ref for _,refs,t in ways if t.get('highway') in MOTOR_ROADS and t.get('area')!='yes' and not any(t.get(k) in ('no','private') for k in ('access','motor_vehicle','motorcar')) for ref in refs}
+        extent=(math.ceil(max(max(abs(q['x']),abs(q['z'])) for q in map(project,eligible_refs))/SIZE)+1)*SIZE
     tiles=collections.defaultdict(list); selected=set(); restricted=0; one_way=set(); projected_nodes={}
     for way_id,refs,tags in ways:
         if tags.get('highway') not in MOTOR_ROADS or tags.get('area')=='yes': continue
         if any(tags.get(k) in ('no','private') for k in ('access','motor_vehicle','motorcar')): restricted+=1;continue
         width,width_source=road_width(tags)
+        if width_defaults and width_source=='estimate':width=width_defaults.get(tags['highway'],width)
         base={'sourceWayId':way_id,'name':tags.get('name:en',tags.get('name','')),'highway':tags['highway'],'oneway':direction(tags),'maxspeed':speed(tags.get('maxspeed')),'layer':int(tags.get('layer','0')) if tags.get('layer','0').lstrip('-').isdigit() else 0,'bridge':tags.get('bridge','no') not in ('no','false','0'),'width':width,'widthSource':width_source,'tags':selected_tags(tags)}
         fragments={}
         for index in range(1,len(refs)):
@@ -83,7 +87,9 @@ def generate(output=OUT, provenance_path=None, extent=EXTENT):
         filename=key.replace(',','_')+'.json'; payload=encode({'version':1,'roads':roads});(OUT/filename).write_bytes(payload)
         index[key]={'file':filename,'sha256':hashlib.sha256(payload).hexdigest(),'bytes':len(payload),'roads':len(roads),'vertices':sum(len(r['points']) for r in roads)}
     source={'file':'export.osm','sha256':digest.hexdigest(),'copyright':'© OpenStreetMap contributors','license':'https://opendatacommons.org/licenses/odbl/1-0/','upstreamCommit':'user binary attachment, reconstructed in numerical order'}
-    manifest={'version':1,'source':source,'projection':{'latitude':lat0,'longitude':lon0,'earthRadius':R},'bounds':{'minX':-extent,'maxX':extent,'minZ':-extent,'maxZ':extent},'tileSize':SIZE,'tiles':index,'origin':{'wayId':ORIGIN_WAY,'nodeId':anchor_id,'name':anchor[2]['name']},'sourceCoverage':{'nodeBounds':bbox,'counts':dict(counts),'highwayClasses':dict(classes),'metadata':meta,'administrativeBoundaryPresent':False},'stats':{'sourceBytes':size,'sourceHighwayWays':len(ways),'integratedWays':len(selected),'oneWayWays':len(one_way),'tiles':len(index),'roadFragments':sum(t['roads'] for t in index.values()),'vertices':sum(t['vertices'] for t in index.values()),'excludedRestrictedWays':restricted},'roadNames':sorted(names),'limitations':[f'Playable road selection: {extent*2/1000:g}km square around a verified Malappuram Bypass vertex; partial uploaded coverage, not the whole district.' if extent!=EXTENT else 'Initial playable window only: 4.8km square around a verified source vertex of Malappuram Bypass Road, not the whole district.','No administrative boundary, building, water or turn-restriction relation coverage is established by this road-only export.','Local metre projection; no surveyed elevation. Unknown widths are estimates; untagged oneway is not legal validation.']}
+    manifest={'version':1,'source':source,'projection':{'latitude':lat0,'longitude':lon0,'earthRadius':R},'bounds':{'minX':-extent,'maxX':extent,'minZ':-extent,'maxZ':extent},'tileSize':SIZE,'tiles':index,'origin':{'wayId':ORIGIN_WAY,'nodeId':anchor_id,'name':anchor[2]['name']},'sourceCoverage':{'nodeBounds':bbox,'counts':dict(counts),'highwayClasses':dict(classes),'metadata':meta,'administrativeBoundaryPresent':False},'stats':{'sourceBytes':size,'sourceHighwayWays':len(ways),'integratedWays':len(selected),'oneWayWays':len(one_way),'tiles':len(index),'roadFragments':sum(t['roads'] for t in index.values()),'vertices':sum(t['vertices'] for t in index.values()),'excludedRestrictedWays':restricted},'roadNames':sorted(names),'selection':{'mode':'all-eligible-source-roads' if full_source else 'bounded-window','fallbackWidths':width_defaults or {}},'limitations':[f'Playable road selection: {extent*2/1000:g}km square around a verified Malappuram Bypass vertex; partial uploaded coverage, not the whole district.' if extent!=EXTENT else 'Initial playable window only: 4.8km square around a verified source vertex of Malappuram Bypass Road, not the whole district.','No administrative boundary, building, water or turn-restriction relation coverage is established by this road-only export.','Local metre projection; no surveyed elevation. Unknown widths are estimates; untagged oneway is not legal validation.']}
+    if not full_source:manifest.pop('selection')
+    else:manifest['limitations'][0]='All eligible public motor-road source ways retained; bounds contain the actual source footprint with one tile safety margin. No administrative district completeness claim.'
     (OUT/'manifest.json').write_bytes(encode(manifest))
     provenance={**manifest,'parts':json.loads((ROOT/'.npm-cache/export-parts-validation.json').read_text())['parts']} if (ROOT/'.npm-cache/export-parts-validation.json').exists() else manifest
     # Keep reconstruction hashes reproducible even outside this preparation workspace.
@@ -91,7 +97,7 @@ def generate(output=OUT, provenance_path=None, extent=EXTENT):
         old=ROOT/'data/EXPORT_PROVENANCE.json'
         if old.exists():provenance['parts']=json.loads(old.read_text())['parts']
     (provenance_path or ROOT/'data/EXPORT_PROVENANCE.json').write_text(json.dumps(provenance,ensure_ascii=False,indent=2)+'\n')
-    print(json.dumps({'projection':manifest['projection'],'origin':manifest['origin'],'stats':manifest['stats'],'roadNames':manifest['roadNames']},ensure_ascii=False))
+    print(json.dumps({'projection':manifest['projection'],'origin':manifest['origin'],'stats':manifest['stats'],'roadNameCount':len(manifest['roadNames'])},ensure_ascii=False))
 if __name__=='__main__':
     import argparse
     parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('--output',type=Path,default=OUT);parser.add_argument('--provenance',type=Path);parser.add_argument('--extent',type=int,default=EXTENT);args=parser.parse_args();generate(args.output,args.provenance,args.extent)

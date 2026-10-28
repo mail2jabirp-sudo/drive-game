@@ -1,3 +1,5 @@
+> Historical 36 km checkpoint. Superseded by the [uploaded-network restoration](NETWORK_RESTORATION.md); the older selection described below remains documented for provenance.
+
 # One unified Malappuram District world
 
 ## This increment

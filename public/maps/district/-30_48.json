@@ -1,0 +1,1 @@
+{"version":1,"roads":[{"sourceWayId":"203650335","name":"","highway":"secondary","oneway":"no","maxspeed":null,"layer":0,"bridge":false,"width":7,"widthSource":"estimate","tags":{"highway":"secondary"},"id":"203650335:-30,48:1","nodeIds":["2136531902","clip:203650335:-17723.435:28800.0"],"points":[{"x":-17721.447,"z":28826.435},{"x":-17723.435,"z":28800.0}]}]}

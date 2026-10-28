@@ -1,0 +1,1 @@
+{"version":1,"roads":[{"sourceWayId":"678341477","name":"","highway":"tertiary","oneway":"no","maxspeed":null,"layer":0,"bridge":false,"width":6,"widthSource":"estimate","tags":{"highway":"tertiary"},"id":"678341477:56,-21:147","nodeIds":["clip:678341477:33600.0:-12193.555","6351661639"],"points":[{"x":33600.0,"z":-12193.555},{"x":33609.413,"z":-12195.743}]}]}

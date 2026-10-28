@@ -31,7 +31,7 @@ The optional HGT importer targets the public Mapzen/Tilezen composite archive. D
 
 ## Unified district derivative
 
-`public/maps/district/` combines the verified road selection from `export.osm` with reprojected prior Kottakkal footprints, landmarks, water and place nodes from `map.osm`. It is distributed under ODbL1.0 with ©OpenStreetMap contributors attribution; both original source XML files and earlier derivatives remain available in this repository. Reproduce with `scripts/import_district.py`; checksums/projections and retained source identities are in `data/DISTRICT_PROVENANCE.json` and the public manifest. This is partial 36km-square road coverage, not a district boundary or complete district. Cafe gameplay stops, roof/material choices and estimated building heights are explicit authored approximations.
+`public/maps/district/` combines the verified road selection from `export.osm` with reprojected prior Kottakkal footprints, landmarks, water and place nodes from `map.osm`. It is distributed under ODbL1.0 with ©OpenStreetMap contributors attribution; both original source XML files and earlier derivatives remain available in this repository. Reproduce with `scripts/import_district.py`; checksums/projections and retained source identities are in `data/DISTRICT_PROVENANCE.json` and the public manifest. The runtime now retains all eligible motor-road ways from the uploaded regional extract, plus supported full `map.osm` auxiliary features. It is not a verified district/state boundary or completeness claim; see NETWORK_RESTORATION.md and data/WORLD_AUDIT.json. Cafe gameplay stops, roof/material choices and estimated building heights are explicit authored approximations.
 
 ## Traffic control derivative and original traffic artwork
 

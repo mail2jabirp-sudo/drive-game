@@ -3,10 +3,13 @@
 from pathlib import Path
 import json,math,hashlib,sys,xml.etree.ElementTree as ET
 from import_export_roads import generate,encode,ROOT,R,SIZE
+from world_features import features,feature_tiles,road_tiles,road_conflicts
 
 def main(output=None,provenance=None):
     out=output or ROOT/'public/maps/district'; provenance=provenance or ROOT/'data/DISTRICT_PROVENANCE.json'
-    generate(out,provenance,18000)
+    defaults=json.loads((ROOT/'data/ROAD_WIDTH_DEFAULTS.json').read_text())
+    if any(not isinstance(w,(int,float)) or not 2<=w<=20 for w in defaults.values()):raise ValueError('Invalid fallback width configuration')
+    generate(out,provenance,18000,full_source=True,width_defaults=defaults)
     m=json.loads((out/'manifest.json').read_text());old=json.loads((ROOT/'public/maps/kottakkal.json').read_text())
     p=m['projection'];op=old['projection']
     def convert(point):
@@ -15,20 +18,28 @@ def main(output=None,provenance=None):
         return {'x':round(R*math.cos(math.radians(p['latitude']))*math.radians(lon-p['longitude']),3),'z':round(-R*math.radians(lat-p['latitude']),3)}
     tiles={key:json.loads((out/t['file']).read_text()) for key,t in m['tiles'].items()}
     present={r['sourceWayId'] for t in tiles.values() for r in t['roads']}
-    reused={'roads':0,'buildings':0,'landmarks':0,'water':0}
+    canonical={n:p for t in tiles.values() for r in t['roads'] for n,p in zip(r['nodeIds'],r['points']) if not n.startswith('clip:')}
+    full,feature_provenance=features(p)
+    conflicts=road_conflicts(full['buildings'],[r for t in tiles.values() for r in t['roads']])
+    reused={'roads':0,'buildings':0,'landmarks':0,'water':0,'landuse':0}
     # Reuse earlier real footprints/water/landmarks in the shared projection. Never reuse fictional scenery.
     # Roads already provided by export keep that snapshot; absent earlier source ways are retained.
     for kind in reused:
-        for feature in old[kind]:
-            if kind=='roads' and feature['sourceWayId'] in present:continue
+        for feature in full[kind]:
+            if kind=='roads':
+                if feature['sourceWayId'] in present:continue
+                for key,item in road_tiles(feature,canonical):
+                    tiles.setdefault(key,{'version':1,'roads':[]})['roads'].append(item)
+                reused[kind]+=1
+                continue
             item=dict(feature)
-            if 'points'in item:item['points']=[convert(q) for q in item['points']];points=item['points']
+            if 'points'in item:points=item['points']
             else:
-                item.update(convert(item));points=[item]
-            cx=sum(q['x'] for q in points)/len(points);cz=sum(q['z'] for q in points)/len(points)
-            key=f'{math.floor(cx/SIZE)},{math.floor(cz/SIZE)}'
-            if key not in tiles:tiles[key]={'version':1,'roads':[]}
-            tiles[key].setdefault(kind,[]).append(item);reused[kind]+=1
+                points=[item]
+            for key in feature_tiles(item):
+                if key not in tiles:tiles[key]={'version':1,'roads':[]}
+                tiles[key].setdefault(kind,[]).append(item)
+            reused[kind]+=1
     # Source-verified bilingual place nodes only, not a hardcoded list of towns.
     places=[]
     for _,e in ET.iterparse(ROOT/'map.osm',events=('end',)):
@@ -61,14 +72,20 @@ def main(output=None,provenance=None):
             distance,x,z,way=min(candidates)
             if distance<40:
                 m['teaStop']={'x':round(x,3),'z':round(z,3),'name':'Near '+cafe['name'],'source':'Authored game stop on source way '+way+' near map.osm landmark '+cafe['id']};break
+    anchors=json.loads((ROOT/'data/WORLD_GAME_ANCHORS.json').read_text())
+    if anchors['sourceSha256']!=m['source']['sha256'] or anchors['projection']!=m['projection']:raise ValueError('Game anchor source/projection mismatch')
+    m['teaStop']=anchors['teaStop']
     m['world']='Malappuram District';m['coverageComplete']=False
     m['additionalSources']=[old['source']];m['reusedKottakkalFeatures']=reused
+    m['featureConflicts']=conflicts
+    m['featureCoverage']={'source':'map.osm','stats':full['stats'],'landuse':len(full['landuse']),'geographicBounds':feature_provenance['sourceBounds'],'limitations':feature_provenance['limitations']}
+    m['stats']['additionalFeatureCopies']=sum(len(t.get(k,[])) for t in tiles.values() for k in ['buildings','landmarks','water','landuse'])
     m['stats']['tiles']=len(tiles)
-    m['limitations']+=['One unified coordinate frame; no administrative district boundary or full district completeness claim.','Previous Kottakkal footprints/water/landmarks reprojected from map.osm; visual heights remain estimates.','Distant requested towns are not added unless verified source features cover them; road-only gaps remain.']
+    m['limitations']+=['One unified coordinate frame; no administrative district boundary or full district completeness claim.','All supported map.osm footprints/water/landmarks/landuse included in the shared projection; visual heights remain estimates.','Distant requested towns are not added unless verified source features cover them; road-only gaps remain.']
     (out/'manifest.json').write_bytes(encode(m))
     previous=json.loads(provenance.read_text());previous.update(m);provenance.write_text(json.dumps(previous,ensure_ascii=False,indent=2)+'\n')
     (out/'NOTICE.txt').write_text('© OpenStreetMap contributors. Derived road/feature database: ODbL 1.0. https://www.openstreetmap.org/copyright\nhttps://opendatacommons.org/licenses/odbl/1-0/\nSources: export.osm and map.osm, preserved in the repository. See data/DISTRICT_PROVENANCE.json and scripts/import_district.py. Partial coverage only.\n')
-    print(json.dumps({'tiles':len(tiles),'reused':reused,'places':places},ensure_ascii=False))
+    print(json.dumps({'tiles':len(tiles),'reused':reused,'placeCount':len(places),'buildingConflicts':len(conflicts['excludedBuildingIds'])},ensure_ascii=False))
 if __name__=='__main__':
     import argparse
     parser=argparse.ArgumentParser();parser.add_argument('--output',type=Path);parser.add_argument('--provenance',type=Path);a=parser.parse_args();main(a.output,a.provenance)

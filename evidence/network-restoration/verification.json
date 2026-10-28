@@ -1,0 +1,52 @@
+{
+  "testedSourceCommit": "ed9782f4ddbe9518113593a0bcd3e59ac212eaee",
+  "baselineCommit": "543d396aad9721f3741da52d74c11cdfccda7176",
+  "checks": {
+    "unit": 73,
+    "fullBrowserRegressionSuite": 33,
+    "additionalContinuous700mDrive": 1,
+    "uniqueBrowserCasesVerified": 34,
+    "compiledProduction": 7,
+    "build": "passed",
+    "sourceMapChecksumGuards": "passed",
+    "matchingCameraAndPose": true
+  },
+  "coverage": {
+    "ways": 39273,
+    "tiles": 8315,
+    "tilePayloadBytes": 50489412,
+    "projectionUnchanged": true,
+    "coverageComplete": false,
+    "maxResidentTiles": 9
+  },
+  "assets": {
+    "/assets/index-CcsMjjk9.js": {
+      "bytes": 665868,
+      "sha256": "0388ba7ad9c5220151ba7f607a60a71b164caa9b6e369fa9b4fb537bc082d164"
+    },
+    "/assets/index-D6fGKujh.css": {
+      "bytes": 23796,
+      "sha256": "e84031b397ceb9b8e53f7c3094728a307c212e53512af2131dda5c627ad20ebf"
+    }
+  },
+  "screenshots": {
+    "continuous-long-bridge.png": "66f494d77af28e246fc84fc32ead7b8c3cf37a22158696375772561fae5feb60",
+    "outskirts-before.png": "66c8a831b4964bdb5c48ea7b19c30c55ee8a2b0c07be31717b1e1e5336598deb",
+    "start-after.png": "596acfc1215c8c48848c9f02d83cc3e8907e9374c4d89460257a5a49d89935f0",
+    "outskirts-after.png": "46ca65a999d77ed76e893f2d2cffe390085a2ba1081565d66645bf02263e6a09",
+    "start-before.png": "805774c660fd2253dcf0a3f027f3f3558bcb6937a73b84aa556da982426b3acb",
+    "mapped-bridge-driving.png": "867714f7c423f0dbc70f33b85339ea93c732e4931101175ea0b66e0cd0703ef8",
+    "restored-region-driving.png": "88a104605aa700b886a7c859e65c1b18aeda30d5648317cec700d61704bcd6eb"
+  },
+  "production": {
+    "url": "https://drive-game-beta.vercel.app/",
+    "liveGameplayVerified": false,
+    "blocker": "Environment HTTPS CONNECT tunnel rejection, 403"
+  },
+  "performance": {
+    "hardwareFpsMeasured": false,
+    "longDriveRenderCalls": 45,
+    "longDriveTriangles": 6267,
+    "longDriveResidentTiles": 8
+  }
+}
