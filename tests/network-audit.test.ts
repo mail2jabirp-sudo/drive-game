@@ -9,3 +9,8 @@ test('streamed overlapping source features deduplicate at tile edges and flagged
  const store=new RoadTileStore(m),a={id:'same',points:[{x:0,z:0}],tags:{},kind:'yes',name:'',height:5,heightSource:'estimate' as const},b={...a,id:'conflicting',renderExcludedReason:'source-road-buffer-overlap'};
  store.resident.set('0,0',{version:1,roads:[],buildings:[a,b],landuse:[{id:'field',name:'',kind:'farmland',points:[],tags:{}}]});store.resident.set('1,0',{version:1,roads:[],buildings:[a],landuse:[{id:'field',name:'',kind:'farmland',points:[],tags:{}}]});assert.deepEqual(store.features().buildings.map(b=>b.id),['same']);assert.equal(store.features().landuse.length,1);
 });
+
+test('expanded feature coverage preserves both existing passenger mission endpoints and routes exactly',async()=>{
+ const {selectMissionStops}=await import('../src/osm-navigation');const baseline=json('data/WORLD_GAME_ANCHORS.json').missionStopsBaseline;
+ for(const snapshot of baseline){const store=new RoadTileStore(m,async url=>new Response(readFileSync('public/maps/district/'+String(url).split('/').pop())), '/maps/district/');await store.load(snapshot.origin);const mission=selectMissionStops({version:1,source:m.source,projection:m.projection,bounds:m.bounds,...store.features(),intersections:[],stats:m.stats});assert.deepEqual(mission,snapshot.mission);}
+});
