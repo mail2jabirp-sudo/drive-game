@@ -13,6 +13,7 @@ import {VEHICLES,readFleet,placeFleet,availableVehicle} from './fleet';
 import type {FleetSave,FleetVehicle} from './fleet';
 import { createStreamedRoadWorld } from './streamed-world';
 import { createOsmWorld } from './osm-world';
+import { validateKottakkalMap } from './map-coordinates';
 import type { OsmMap } from './osm-types';
 import {roadSpawn} from './road-spawn';
 import { nearestRoad } from './osm-navigation';
@@ -120,7 +121,7 @@ try {
     const response = await fetch(`${import.meta.env.BASE_URL}maps/kottakkal.json`);
     if (!response.ok) throw new Error(`Map request failed: ${response.status}`);
     mapData = await response.json() as OsmMap;
-    if (mapData.version !== 1 || !mapData.roads?.length || !mapData.source?.sha256) throw new Error('Invalid map data; regenerate with npm run map:import');
+    validateKottakkalMap(mapData); // Legacy extract only; district manifests retain their own origin and checks.
     mapId = mapData.source.sha256;
   }
   const landscape = isReal ? {update: (_camera:THREE.Vector3) => {}, setLowDetail: (_low:boolean) => {}, chunkCount:0} : createLandscape(scene);

@@ -155,3 +155,16 @@ test('DTD input is rejected rather than expanding entities or editing source', (
   assert.equal(result.status,1); assert.match(result.stderr,/DTD\/entity declarations/);
   assert.equal(readFileSync(input,'utf8'),raw);
 }));
+
+test('default Kottakkal import rejects a correctly named anchor in the wrong geographic location', () => temporary(directory => {
+  const input = join(directory, 'wrong-location.osm'), output = join(directory, 'map.json');
+  const refs = wayRefs('378587276');
+  const unique = [...new Set(refs)];
+  const nodes = unique.map(id => { const p = sourceNode(id); return `<node id="${id}" lat="${p.lat + 5}" lon="${p.lon}"/>`; }).join('');
+  const xml = `<osm>${nodes}<way id="378587276">${refs.map(ref => `<nd ref="${ref}"/>`).join('')}<tag k="name" v="Kottakkal Bus stand"/><tag k="amenity" v="bus_station"/></way></osm>`;
+  writeFileSync(input, xml);
+  const result = spawnSync('python3', [script, '--input', input, '--output', output], { encoding: 'utf8' });
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /incorrect Kottakkal anchor location/);
+  assert.equal(readFileSync(input, 'utf8'), xml);
+}));

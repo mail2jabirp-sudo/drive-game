@@ -15,6 +15,7 @@ from pathlib import Path
 import re
 import sys
 import xml.etree.ElementTree as ET
+from map_geography import coordinate_bounds, kottakkal_anchor
 
 REPO = Path(__file__).resolve().parents[1]
 EARTH_RADIUS = 6371008.8
@@ -179,11 +180,13 @@ def import_map(input_path: Path, extent: float, origin_lat: float | None = None,
     if root.tag != 'osm':
         raise ValueError('expected an <osm> XML document')
     nodes = {n.attrib['id']: n for n in root.findall('node')}
+    actual_bounds = coordinate_bounds(nodes)
     ways = root.findall('way')
     if (origin_lat is None) != (origin_lon is None):
         raise ValueError('--origin-lat and --origin-lon must be supplied together')
     origin_source = {'type': 'explicit', 'id': None, 'method': 'explicit CLI origin'}
     if origin_lat is None:
+        kottakkal_anchor(root, nodes)
         anchor = next((w for w in ways if w.get('id') == BUS_STAND_WAY), None)
         if anchor is None:
             raise ValueError('Kottakkal bus-stand way is missing; provide an explicit test/import origin')
@@ -303,6 +306,7 @@ def import_map(input_path: Path, extent: float, origin_lat: float | None = None,
             'intersections': intersections, 'stats': dict(sorted(stats.items()))}
     map_bounds = root.find('bounds')
     provenance = {'source': source, 'sourceBytes': len(raw), 'sourceBounds': dict(map_bounds.attrib) if map_bounds is not None else None,
+                  'actualSourceNodeBounds': actual_bounds,
                   'originFeature': origin_source, 'projection': data['projection'], 'bounds': data['bounds'],
                   'formula': 'x=R*cos(latitude0)*radians(longitude-longitude0); z=-R*radians(latitude-latitude0)',
                   'units': 'metres', 'coordinatePrecisionMetres': 0.001,
@@ -332,6 +336,11 @@ def main():
         parser.error('--extent must be finite and between 10 and 3000 metres')
     try:
         data, provenance = import_map(args.input, args.extent, args.origin_lat, args.origin_lon, args.upstream_commit)
+        if args.output.resolve() == (REPO / 'public/maps/kottakkal.json').resolve():
+            anchor_root = ET.fromstring(args.input.read_bytes())
+            anchor = kottakkal_anchor(anchor_root, {n.get('id'): n for n in anchor_root.findall('node')})
+            if any(abs(data['projection'][k] - anchor[k]) > 1e-9 for k in ('latitude', 'longitude')):
+                raise ValueError('production Kottakkal output must use the verified bus-stand origin')
         args.output.parent.mkdir(parents=True, exist_ok=True)
         provenance_path = args.provenance or (REPO / 'data/OSM_PROVENANCE.json' if args.output.resolve() == (REPO / 'public/maps/kottakkal.json').resolve() else args.output.with_suffix('.provenance.json'))
         provenance_path.parent.mkdir(parents=True, exist_ok=True)

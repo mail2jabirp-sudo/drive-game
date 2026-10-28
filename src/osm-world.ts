@@ -7,6 +7,10 @@ import {createArchitectureMaterials} from './architecture-materials';
 import type { MapPoint, OsmMap, OsmRoad } from './osm-types';
 import { nearestRoad, pointInPolygon, segmentDistance, selectMissionStops } from './osm-navigation';
 import type { Collider } from './world';
+import { buildRoadFoundation, roadPaintSegments } from './road-foundation';
+import { roadProfile } from './road-profile';
+import { createKeralaRoadMaterials } from './road-materials';
+import { buildRoadDressing } from './road-dressing';
 
 /** Render a bounded source-data slice, not a fabricated road network or surveyed building model. */
 export function createOsmWorld(scene: THREE.Scene, data: OsmMap, missionOverride?: ReturnType<typeof selectMissionStops>, terrain?: {heightAt:(x:number,z:number)=>number}, focus?:MapPoint): {
@@ -25,10 +29,12 @@ export function createOsmWorld(scene: THREE.Scene, data: OsmMap, missionOverride
 } {
   const root = new THREE.Group(); root.name = 'OSM Kottakkal source geometry'; scene.add(root);
   const townMaterial = createTownMaterials();
-  const asphalt = townMaterial('#535e60');
-  const shoulder = new THREE.MeshStandardMaterial({color:'#817a68',roughness:1});
-  const unpaved = townMaterial('#9cb57c');
-  const concrete = townMaterial('#c9c6ae');
+  const roadMaterials = createKeralaRoadMaterials();
+  for(const [name,material] of Object.entries(roadMaterials))material.name=`Integrated road ${name}`;
+  const channelMaterial=roadMaterials.detail.clone();channelMaterial.polygonOffsetUnits=-18;
+  const coverMaterial=roadMaterials.detail.clone();coverMaterial.polygonOffsetUnits=-20;
+  const roadDetailMaterials=new Set<THREE.Material>([roadMaterials.detail,channelMaterial,coverMaterial]);
+  const roadsById=new Map(data.roads.map(road=>[road.id,road]));
   const heightAt = (x:number,z:number) => terrain?.heightAt(Math.max(data.bounds.minX,Math.min(data.bounds.maxX,x)),Math.max(data.bounds.minZ,Math.min(data.bounds.maxZ,z))) ?? 0;
   const wall = townMaterial('#c2c8ae'); wall.vertexColors = true;wall.name='Verified footprint facades';
   const tiledRoof=townMaterial('#b76545');tiledRoof.side=THREE.DoubleSide;tiledRoof.name='Approximate Kerala tiled roofs';
@@ -38,7 +44,7 @@ export function createOsmWorld(scene: THREE.Scene, data: OsmMap, missionOverride
   const grass=new THREE.MeshStandardMaterial({color:'#81925d',side:THREE.DoubleSide,roughness:1});grass.name='Decorative grass';
   const leaves=new THREE.MeshStandardMaterial({color:'#3e7046',roughness:1,side:THREE.DoubleSide});leaves.name='Decorative palm crowns';
   const bridgeRail=new THREE.MeshStandardMaterial({color:'#b6b5a4',roughness:.8});bridgeRail.name='Mapped bridge rail artwork';
-  const roadPaint = new THREE.MeshStandardMaterial({ color: '#d2ccaf', roughness: 1 });
+  const roadPaint = new THREE.MeshStandardMaterial({ color: '#d2ccaf', roughness: 1, polygonOffset:true, polygonOffsetFactor:-1, polygonOffsetUnits:-24 });
   const waterMaterial = new THREE.MeshStandardMaterial({ color: '#5f9290', roughness: 0.35, metalness: 0.1, side: THREE.DoubleSide });
   const centerX=(data.bounds.minX+data.bounds.maxX)/2,centerZ=(data.bounds.minZ+data.bounds.maxZ)/2;
   // A nearby flat patch avoids huge-triangle depth precision hiding roads far from the origin.
@@ -117,41 +123,48 @@ export function createOsmWorld(scene: THREE.Scene, data: OsmMap, missionOverride
       const key = `${ix},${iz}`, list = cells.get(key) ?? []; list.push(item); cells.set(key, list);
     }
   };
+  // Render-only tessellation preserves main's DEM sampling contract. Source
+  // arrays, routing, tile IDs and collision queries are never rewritten.
+  const renderData:OsmMap=terrain?{...data,roads:data.roads.map(road=>{
+    const points=[road.points[0]],nodeIds=[road.nodeIds[0]];
+    for(let i=1;i<road.points.length;i++){
+      const pieces=roadPieces(road.points[i-1],road.points[i]);
+      pieces.forEach((piece,n)=>{points.push(piece.b);nodeIds.push(n===pieces.length-1?road.nodeIds[i]:`render:${road.id}:${i}:${n}`);});
+    }
+    return {...road,points,nodeIds};
+  })}:data;
+  const foundation=buildRoadFoundation(renderData),dressing=buildRoadDressing(renderData,foundation);
+  const patchSurface=(ids:string[])=>{
+    const surfaces=ids.map(id=>roadProfile(roadsById.get(id)!).surface);
+    return surfaces.includes('asphalt')?'asphalt':surfaces.includes('concrete')?'concrete':'gravel';
+  };
+  const patchHeight=(ids:string[])=>.035+Math.max(...ids.map(id=>roadsById.get(id)!.layer))*.001;
+  const patchCenter=(points:MapPoint[])=>({x:points.reduce((n,p)=>n+p.x,0)/points.length,z:points.reduce((n,p)=>n+p.z,0)/points.length});
+  const roadShape=(points:MapPoint[],height:number)=>{
+    const geometry=flatShape(points,height),positions=geometry.getAttribute('position'),uv=geometry.getAttribute('uv');
+    for(let i=0;i<positions.count;i++){
+      const x=positions.getX(i),z=positions.getZ(i);
+      if(terrain)positions.setY(i,height+heightAt(x,z));
+      uv.setXY(i,x/2,z/2);
+    }
+    if(terrain)geometry.computeVertexNormals();
+    return geometry;
+  };
+  for(const patch of dressing.shoulders)addGeometry(roadShape(patch.points,patchHeight(patch.roadIds)-.009),roadMaterials.shoulder,patchCenter(patch.points));
+  for(const patch of foundation.patches)addGeometry(roadShape(patch.points,patchHeight(patch.roadIds)),roadMaterials[patchSurface(patch.roadIds)],patchCenter(patch.points));
+  for(const detail of dressing.details){
+    const material=detail.kind==='drain-channel'?channelMaterial:detail.kind==='cover'?coverMaterial:roadMaterials.detail;
+    addGeometry(roadShape(detail.points,patchHeight([detail.roadId])+(detail.kind==='repair'?.005:-.004)),material,patchCenter(detail.points),true,new THREE.Color(detail.color));
+  }
+  for(const road of data.roads)for(const [a,b] of roadPaintSegments(road,foundation.junctionRadii)){
+    addGeometry(lineQuad(a,b,.1,patchHeight([road.id])+.008),roadPaint,{x:(a.x+b.x)/2,z:(a.z+b.z)/2},true);
+  }
   for (const road of data.roads) for (let i = 1; i < road.points.length; i++) {
     const a = road.points[i - 1], b = road.points[i], middle = { x: (a.x + b.x) / 2, z: (a.z + b.z) / 2 };
-    const y = 0.035 + road.layer * 0.001;
-    const surface = road.tags.surface;
-    const roadMaterial = ['gravel','unpaved','dirt','ground','compacted','earth'].includes(surface) ? unpaved : surface==='concrete' ? concrete : asphalt;
-    const pieces=terrain?roadPieces(a,b):[{a,b}];
-    for(const piece of pieces){
-      const middlePiece={x:(piece.a.x+piece.b.x)/2,z:(piece.a.z+piece.b.z)/2};
-      // Authored gravel verge only; not a claim of surveyed shoulders or sidewalks.
-      if(['trunk','primary','secondary','tertiary'].includes(road.highway)) addGeometry(lineQuad(piece.a,piece.b,road.width+1.2,y-0.009),shoulder,middlePiece);
-      addGeometry(lineQuad(piece.a,piece.b,road.width,y),roadMaterial,middlePiece);
-    }
     // Bridge position/alignment is mapped; these flat-deck rails are approximate
     // artwork, not surveyed bridge clearance or a substitute for missing DEM.
     if(road.bridge){const dx=b.x-a.x,dz=b.z-a.z,length=Math.hypot(dx,dz);if(length>.05)for(const side of [-1,1]){const ox=-dz/length*(road.width/2+.15)*side,oz=dx/length*(road.width/2+.15)*side;for(const level of [.45,.85]){const from=new THREE.Vector3(a.x+ox,heightAt(a.x,a.z)+level,a.z+oz),to=new THREE.Vector3(b.x+ox,heightAt(b.x,b.z)+level,b.z+oz),g=new THREE.CylinderGeometry(.045,.045,from.distanceTo(to),5);g.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,1,0),to.clone().sub(from).normalize()));g.translate(...from.clone().lerp(to,.5).toArray() as [number,number,number]);addGeometry(g,bridgeRail,middle);}}}
-    const join=(p:MapPoint)=>{
-      // Round only the rendered pavement buffer: source centre lines and node IDs
-      // stay exact. Matching verge joins prevent sharp shoulder holes at bends.
-      if(['trunk','primary','secondary','tertiary'].includes(road.highway)){
-        const verge=new THREE.CircleGeometry((road.width+1.2)/2,24);verge.rotateX(-Math.PI/2);verge.translate(p.x,y-.009,p.z);
-        if(terrain){const v=verge.getAttribute('position');for(let j=0;j<v.count;j++)v.setY(j,y-.009+heightAt(v.getX(j),v.getZ(j)));verge.computeVertexNormals();}
-        addGeometry(verge,shoulder,p);
-      }
-      const disc=new THREE.CircleGeometry(road.width/2,24);disc.rotateX(-Math.PI/2);disc.translate(p.x,y,p.z);
-      if(terrain){const positions=disc.getAttribute('position');for(let i=0;i<positions.count;i++)positions.setY(i,y+heightAt(positions.getX(i),positions.getZ(i)));disc.computeVertexNormals();}
-      addGeometry(disc,roadMaterial,p);
-    };
-    join(a);if(i===road.points.length-1)join(b);
     register(segmentCells, { a, b, road }, { minX: Math.min(a.x, b.x) - road.width, maxX: Math.max(a.x, b.x) + road.width, minZ: Math.min(a.z, b.z) - road.width, maxZ: Math.max(a.z, b.z) + road.width });
-    // Neutral centre guidance on wider two-way roads; this is authored paint, not imported lane survey.
-    const length = Math.hypot(b.x - a.x, b.z - a.z);
-    if (roadMaterial!==unpaved && road.oneway === 'no' && road.width >= 6) for (let offset = 2; offset + 2 < length; offset += 8) {
-      const start = offset / length, end = (offset + 2.5) / length;
-      addGeometry(lineQuad({ x: a.x + (b.x - a.x) * start, z: a.z + (b.z - a.z) * start }, { x: a.x + (b.x - a.x) * end, z: a.z + (b.z - a.z) * end }, 0.1, y + 0.008), roadPaint, middle, true);
-    }
   }
   const roadSurface = (x: number, z: number): boolean => (segmentCells.get(`${Math.floor(x / cellSize)},${Math.floor(z / cellSize)}`) ?? []).some(s => segmentDistance({ x, z }, s.a, s.b).distance <= s.road.width / 2 + 0.4);
   const buildingCells = new Map<string, typeof data.buildings>();
@@ -239,6 +252,8 @@ export function createOsmWorld(scene: THREE.Scene, data: OsmMap, missionOverride
     // preserve the original geographic placement and collision coordinates.
     geometry.translate(-chunk.x,0,-chunk.z);
     const mesh = new THREE.Mesh(geometry, batch.material);mesh.position.set(chunk.x,0,chunk.z); mesh.receiveShadow = true; mesh.castShadow = Object.values(architecture).includes(batch.material);
+    mesh.userData.roadDressing=roadDetailMaterials.has(batch.material);
+    if(Object.values(roadMaterials).includes(batch.material as THREE.MeshStandardMaterial))mesh.name=batch.material.name;
     mesh.userData.architectureLod=batch.lod;chunk.group.add(mesh); if (batch.detail) chunk.detail.push(mesh);if(batch.lod)chunk.architectural.push({mesh,lod:batch.lod});
     for (const geometry of batch.geometries) geometry.dispose(); batch.geometries.length = 0;
   }
@@ -268,7 +283,7 @@ export function createOsmWorld(scene: THREE.Scene, data: OsmMap, missionOverride
       for (const chunk of chunks.values()) {
         const distance = Math.hypot(cameraPosition.x - chunk.x, cameraPosition.z - chunk.z);
         chunk.group.visible = distance < (lowDetail ? 220 : 330) + chunk.radius;
-        for (const detail of chunk.detail) detail.visible = lowDetail?distance<110:distance<205;
+        for (const detail of chunk.detail) detail.visible = detail.userData.roadDressing?(!lowDetail&&distance<205):(lowDetail?distance<110:distance<205);
         const close=distance-Math.min(120,chunk.architectureRadius)<(lowDetail?55:115);
         for(const item of chunk.architectural)item.mesh.visible=item.lod==='near'?close:!close;
       }
@@ -283,6 +298,7 @@ export function createOsmWorld(scene: THREE.Scene, data: OsmMap, missionOverride
       root.removeFromParent();
       const geometries = new Set<THREE.BufferGeometry>(), materials = new Set<THREE.Material>(), textures = new Set<THREE.Texture>();
       root.traverse(object => { if (object instanceof THREE.Mesh) { geometries.add(object.geometry); for (const material of Array.isArray(object.material) ? object.material : [object.material]) materials.add(material); } });
+      for(const material of [...Object.values(roadMaterials),channelMaterial,coverMaterial])materials.add(material);
       for (const material of materials) {
         for (const value of Object.values(material)) if (value instanceof THREE.Texture) textures.add(value);
         material.dispose();
