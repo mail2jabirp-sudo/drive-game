@@ -1751,3 +1751,5 @@ kbd {
 .on-foot .touch-auxiliary .handbrake-button{font-size:10px;letter-spacing:.2px}
 
 .vehicle-prompt{position:fixed;z-index:7;transform:translate(-50%,-100%);padding:8px 12px;border:1px solid #d8ca8d80;border-radius:9px;background:#102722eb;color:#f5edce;font:600 12px system-ui;pointer-events:none;max-width:230px;text-align:center}.vehicle-prompt[hidden]{display:none}
+/* Walking instructions use the full mission heading width; fare rewards apply in vehicles. */
+.on-foot .mission-topline{display:none}.on-foot .mission-heading h2{margin-right:0}
