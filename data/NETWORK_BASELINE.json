@@ -1,0 +1,24 @@
+{
+  "bounds": {
+    "minX": -18000,
+    "maxX": 18000,
+    "minZ": -18000,
+    "maxZ": 18000
+  },
+  "stats": {
+    "sourceBytes": 52112410,
+    "sourceHighwayWays": 43226,
+    "integratedWays": 19225,
+    "oneWayWays": 292,
+    "tiles": 3535,
+    "roadFragments": 32131,
+    "vertices": 303581,
+    "excludedRestrictedWays": 257
+  },
+  "reusedKottakkalFeatures": {
+    "roads": 0,
+    "buildings": 203,
+    "landmarks": 107,
+    "water": 4
+  }
+}

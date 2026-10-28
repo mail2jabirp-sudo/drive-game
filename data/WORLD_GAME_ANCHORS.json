@@ -1,0 +1,15 @@
+{
+  "sourceSha256": "7915b6d48899723c3dd4a88dfd8c3db64d77e0e85e60d9e99511c2bb6b7ac3f2",
+  "projection": {
+    "latitude": 11.0544807,
+    "longitude": 76.0863541,
+    "earthRadius": 6371008.8
+  },
+  "teaStop": {
+    "x": -8399.586,
+    "z": 5707.629,
+    "name": "Near New galaxy coolbar",
+    "source": "Authored game stop on source way 381689700 near map.osm landmark node/8898331062"
+  },
+  "note": "Preserved existing authored game stop near a verified map.osm cafe; not a surveyed entrance or parking bay."
+}
