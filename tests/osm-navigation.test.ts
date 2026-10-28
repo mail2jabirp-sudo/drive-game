@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import type { OsmMap, OsmRoad } from '../src/osm-types.ts';
 import { createRoadGraph, nearestRoad, pointInPolygon, segmentDistance, shortestPaths, selectMissionStops } from '../src/osm-navigation.ts';
 import { createOsmWorld } from '../src/osm-world.ts';
+import { ROAD_SURFACE_Y, buildRoadFoundation, buildingConflictsWithRoad } from '../src/road-foundation.ts';
 const source = JSON.parse(readFileSync(new URL('../public/maps/kottakkal.json', import.meta.url), 'utf8')) as OsmMap;
 const road = (id: string, nodeIds: string[], points: {x:number;z:number}[], oneway: OsmRoad['oneway'] = 'no'): OsmRoad => ({id,sourceWayId:id,nodeIds,points,oneway,name:'Test source road',highway:'primary',layer:0,bridge:false,maxspeed:null,width:6,widthSource:'estimate',tags:{}});
 function createFixture(data: OsmMap) {
@@ -79,4 +80,36 @@ test('every imported road segment and both passenger stops are traversable in th
   }
   for(const point of [world.spawn,world.pickup,world.dropoff])assert.equal(world.isBlocked(point.x,point.z),false);
   world.dispose();
+});
+
+test('real foundation shares a flat datum and omits only road-conflicting visual building models', () => {
+  const original = JSON.stringify(source), { scene, world } = createFixture(source);
+  const f = buildRoadFoundation(source), omitted = new Set(world.foundationStats.omittedBuildingIds);
+  assert.ok(omitted.size > 0 && omitted.size < source.buildings.length / 2, 'bounded conflict handling must retain the majority of source models');
+  for (const building of source.buildings) {
+    assert.equal(omitted.has(building.id), f.patches.some(p => buildingConflictsWithRoad(building, p)), `model conflict decision ${building.id}`);
+  }
+  let asphaltMeshes = 0;
+  const renderedRoads: THREE.Mesh[] = [];
+  scene.traverse(object => {
+    if (!(object instanceof THREE.Mesh) || object.name !== 'OSM asphalt foundation') return;
+    asphaltMeshes++;
+    renderedRoads.push(object);
+    const position = object.geometry.getAttribute('position');
+    for (let i = 0; i < position.count; i++) assert.ok(Math.abs(position.getY(i) - ROAD_SURFACE_Y) < 1e-6, 'all road layers share the declared flat datum');
+  });
+  assert.ok(asphaltMeshes > 0);
+  scene.updateMatrixWorld(true);
+  const ray = new THREE.Raycaster(); ray.ray.direction.set(0, -1, 0);
+  for (const road of source.roads) for (let i = 1; i < road.points.length; i++) {
+    const a = road.points[i - 1], b = road.points[i];
+    ray.ray.origin.set((a.x + b.x) / 2, 20, (a.z + b.z) / 2);
+    const hit = ray.intersectObjects(renderedRoads, false)[0];
+    assert.ok(hit && Math.abs(hit.point.y - ROAD_SURFACE_Y) < 1e-6, `actual asphalt triangles must cover source segment ${road.id}:${i}`);
+  }
+  assert.equal(JSON.stringify(source), original);
+  let boundaryLabels = 0;
+  scene.traverse(o => { if (o.name === 'Playable boundary; not a source road end') boundaryLabels++; });
+  assert.equal(boundaryLabels, world.foundationStats.boundaryEnds);
+  world.dispose(); assert.equal(scene.children.length, 0);
 });

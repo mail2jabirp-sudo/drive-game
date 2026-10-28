@@ -1,5 +1,21 @@
 # EN 3D development checkpoints
 
+## Phase 05 — Realistic Kerala Roads (28 October 2026)
+
+Implemented original shared aggregate/roughness textures, tagged concrete/gravel variation, explicit retained class-width profiles, 1,028 clearance-filtered shoulder patches, conservative centre markings on eight road parts, and 324 optional repair/drainage/cover patches. Source roads/widths/coordinates/graph, physical surface/colliders, saves, HUD/minimap and practice behavior remain unchanged. Drains/repairs are authored decorative approximations; Battery saver hides them while keeping shoulders and eligible guidance. Phase 04's same 34 building models remain withheld; all source footprints remain present.
+
+All 39 unit tests, all 11 Chromium browser tests and TypeScript/production/source-freshness build pass. GPU coverage now checks asphalt against shoulder underlays. Matched Battery saver spawn: 100 calls/6,149 triangles before, 109 calls/6,475 after. Mobile low/full-detail stress samples: 113/6,515 and 136/8,168. These are software render costs, not phone FPS. Whole-map expanded vertices: 61,916; same 82 chunks. Existing bundle advisory remains (~589 kB minified/~160 kB gzip).
+
+See PHASE_05_REALISTIC_KERALA_ROADS.md and research/phase05/ for modified files, before/after screenshots, per-road audit, performance risks and limits. No dependency change, merge, push, publish or deployment. Stop for approval after this phase.
+
+## Phase 04 — Kottakkal Map Foundation (28 October 2026)
+
+The user's approved research/map-foundation sequence is separate from ROADMAP.md's older numbered traffic queue. Implemented source/derivative geographic guards, reversible coordinate functions, shared bevel-joined road patches for rendering/surface checks, bounded clipping and junction paint, a flat ground/tire datum with tested depth offsets, source-vs-boundary endpoint labels, and conservative render-only building clearance. Raw XML, derived JSON, origin/coordinates, directed source topology and saves remain unchanged. 169 approximate building models render; 34 conflicts are withheld and listed for review while all 203 footprints remain in the source database. No guessed links were added between the nine source graph components.
+
+Read PHASE_04_MAP_FOUNDATION.md for geographic audit decisions, modified files, exact limitations, tests and matched before/after screenshots in research/phase04/. No new runtime dependency, merge, push, publication or deployment. Stop for review after this phase.
+
+Final validation: all 34 unit tests, all 10 Chromium browser tests, strict TypeScript and production/source-freshness build passed. Screenshot inspection caught and resolved an intermediate flush-surface depth artifact; the browser suite now checks actual GPU road-over-ground coverage. Matched spawn sample decreased from 102 calls/6,990 triangles to 100 calls/6,149 triangles; this includes withheld models and is not a physical-phone FPS claim. Existing bundle-size advisory remains (~583 kB minified/~158 kB gzip).
+
 All work belongs to `/workspace/drive-game`. Do not modify other repositories.
 
 - Toolchain initialized: TypeScript, Three.js, Vite, npm lockfile, MIT license.

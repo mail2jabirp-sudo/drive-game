@@ -203,3 +203,103 @@ test('a failed map fetch offers the original game without erasing either saved r
   expect(restored.osmRide).toEqual(legacy.osmRide);
   expect(restored.teaBreaks).toBe(legacy.teaBreaks);
 });
+
+test('a misplaced map is rejected before rendering or modifying either saved ride', async ({ page }) => {
+  const save = { version: 1, money: 450, trips: 2, teaBreaks: 1, phase: 'dropoff', x: 72, z: -6, heading: 0,
+    osmRide: { version: 1, mapId: map.source.sha256, ...stops.pickup, heading: stops.spawn.heading, phase: 'dropoff' } };
+  await installSeed(page, save);
+  const misplaced = structuredClone(map); misplaced.projection.latitude = 11.25;
+  await page.route('**/maps/kottakkal.json*', route => route.fulfill({ json: misplaced }));
+  await page.goto('/?world=osm');
+  await expect(page.locator('#fatal-error')).toBeVisible();
+  await expect(page.locator('#fatal-error')).toContainText('does not match the verified Kottakkal area');
+  expect(await readSave(page)).toEqual(save);
+  await expect(page.locator('#fatal-error a')).toHaveAttribute('href', '?world=practice');
+});
+
+test('foundation renders with aligned tires and explicit map boundary labels', async ({ page }) => {
+  await page.addInitScript(key => localStorage.setItem(key, 'low'), DISPLAY_KEY);
+  await page.route('**/src/main.ts*', async route => {
+    const response = await route.fetch();
+    await route.fulfill({ response, body: (await response.text()).replace('renderer.render(scene, camera);', `renderer.render(scene, camera);
+      window.__foundationProbe = { stats: realWorld?.foundationStats, vehicleY: rickshaw.group.position.y,
+        calls: renderer.info.render.calls, triangles: renderer.info.render.triangles };
+      if (!window.__depthSamples && realWorld) {
+        const testScene = new THREE.Scene();
+        const groundMaterial = new THREE.MeshBasicMaterial({ color: 0x00ff00, toneMapped: false });
+        const roadMaterials = [];
+        const root = scene.getObjectByName('OSM Kottakkal source geometry');
+        const groundClone = root.children[0].clone(); groundClone.material = groundMaterial; testScene.add(groundClone);
+        root.traverse(o => {
+          if (!['OSM asphalt foundation', 'Authored road shoulder'].includes(o.name)) return;
+          const material = new THREE.MeshBasicMaterial({ color: o.name === 'OSM asphalt foundation' ? 0xff0000 : 0x00ff00, toneMapped: false,
+            polygonOffset: o.material.polygonOffset, polygonOffsetFactor: o.material.polygonOffsetFactor, polygonOffsetUnits: o.material.polygonOffsetUnits });
+          const clone = o.clone(); clone.material = material; clone.visible = true; testScene.add(clone); roadMaterials.push(material);
+        });
+        const target = new THREE.WebGLRenderTarget(64, 64);
+        const testCamera = new THREE.PerspectiveCamera(52, 1, .1, 600);
+        const samples = [];
+        for (const point of realWorld.mission.route.slice(0, 3)) {
+          testCamera.position.set(point.x, 180, point.z + .00001); testCamera.lookAt(point.x, 0, point.z);
+          renderer.setRenderTarget(target); renderer.render(testScene, testCamera);
+          const pixels = new Uint8Array(4); renderer.readRenderTargetPixels(target, 32, 32, 1, 1, pixels); samples.push(Array.from(pixels));
+        }
+        renderer.setRenderTarget(null); target.dispose(); groundMaterial.dispose(); roadMaterials.forEach(m => m.dispose());
+        window.__depthSamples = samples;
+      }`) });
+  });
+  await start(page);
+  await expect.poll(() => page.evaluate(() => (window as any).__foundationProbe?.stats?.joins ?? 0)).toBeGreaterThan(0);
+  const p = await page.evaluate(() => (window as any).__foundationProbe);
+  expect(p.vehicleY).toBeCloseTo(.004, 6);
+  expect(p.stats.boundaryEnds).toBeGreaterThan(0);
+  expect(p.stats.omittedBuildingIds.length).toBeGreaterThan(0);
+  expect(p.stats.omittedBuildingIds.length).toBeLessThan(map.buildings.length / 2);
+  expect(p.calls).toBeLessThan(300); expect(p.triangles).toBeLessThan(200_000);
+  const depthSamples = await page.evaluate(() => (window as any).__depthSamples);
+  expect(depthSamples).toHaveLength(3);
+  for (const pixel of depthSamples) {
+    expect(pixel[0]).toBeGreaterThan(240); expect(pixel[1]).toBeLessThan(10);
+  }
+});
+
+test('Kerala road dressing stays within mobile render budgets and keeps optional details out of Battery saver', async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 844, height: 390 }, deviceScaleFactor: .75, isMobile: true, hasTouch: true });
+  try {
+    const page = await context.newPage(), errors: string[] = [];
+    page.on('pageerror', e => errors.push(e.message));
+    await page.addInitScript(key => localStorage.setItem(key, 'low'), DISPLAY_KEY);
+    await page.route('**/src/main.ts*', async route => {
+      const response = await route.fetch();
+      await route.fulfill({ response, body: (await response.text()).replace('renderer.render(scene, camera);', `
+        if (window.__forceStyleDetails) realWorld?.update(elapsed, camera.position, false);
+        renderer.render(scene, camera);
+        let detailMeshes = 0;
+        scene.traverseVisible(o => { if (o.name === 'Authored road weathering and drainage') detailMeshes++; });
+        window.__roadStyleProbe = { styles: realWorld?.roadStyleStats, details: detailMeshes,
+          calls: renderer.info.render.calls, triangles: renderer.info.render.triangles, textures: renderer.info.memory.textures,
+          mapHash: mapData?.source.sha256, camera: camera.position.toArray() };`) });
+    });
+    await start(page);
+    await expect.poll(() => page.evaluate(() => (window as any).__roadStyleProbe?.styles?.drains ?? 0)).toBeGreaterThan(0);
+    const low = await page.evaluate(() => (window as any).__roadStyleProbe);
+    expect(low.details).toBe(0);
+    expect(low.styles.shoulderPatches).toBeGreaterThan(500);
+    expect(low.styles.markedRoads).toBe(8);
+    expect(low.styles.concreteRoads).toBe(1); expect(low.styles.gravelRoads).toBe(1);
+    expect(low.calls).toBeLessThan(160); expect(low.triangles).toBeLessThan(12000);
+    await page.screenshot({ path: 'research/phase05/after-mobile-landscape.png' });
+    await page.evaluate(() => { (window as any).__forceStyleDetails = true; });
+    await expect.poll(() => page.evaluate(() => (window as any).__roadStyleProbe?.details ?? 0)).toBeGreaterThan(0);
+    const full = await page.evaluate(() => (window as any).__roadStyleProbe);
+    expect(full.calls).toBeLessThan(220); expect(full.triangles).toBeLessThan(18000); expect(full.textures).toBeLessThan(40);
+    expect(full.mapHash).toBe(map.source.sha256); expect(full.camera.every(Number.isFinite)).toBe(true);
+    console.log('Phase 05 mobile low/detail samples:', JSON.stringify({ low, full }));
+    await page.evaluate(() => { (window as any).__forceStyleDetails = false; });
+    await page.setViewportSize({ width: 390, height: 844 });
+    await expect(page.locator('[data-control="throttle"]')).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    await page.screenshot({ path: 'research/phase05/after-mobile-portrait.png' });
+    expect(errors).toEqual([]);
+  } finally { await context.close(); }
+});

@@ -8,6 +8,8 @@ import { createRickshaw } from './vehicle';
 import { createOsmWorld } from './osm-world';
 import type { OsmMap } from './osm-types';
 import { nearestRoad } from './osm-navigation';
+import { validateKottakkalMap } from './map-coordinates';
+import { ROAD_SURFACE_Y } from './road-foundation';
 import { WORLD_KEY, readOsmRide, serializeRouteProgress } from './route-save';
 import { advanceCar, blocked, onRoad } from './driving';
 import type { DriveState } from './driving';
@@ -99,7 +101,7 @@ try {
     const response = await fetch(`${import.meta.env.BASE_URL}maps/kottakkal.json`);
     if (!response.ok) throw new Error(`Map request failed: ${response.status}`);
     mapData = await response.json() as OsmMap;
-    if (mapData.version !== 1 || !mapData.roads?.length || !mapData.source?.sha256) throw new Error('Invalid map data; regenerate with npm run map:import');
+    validateKottakkalMap(mapData);
     mapId = mapData.source.sha256;
   }
   const landscape = isReal ? {update: (_camera:THREE.Vector3) => {}, setLowDetail: (_low:boolean) => {}, chunkCount:0} : createLandscape(scene);
@@ -371,7 +373,7 @@ try {
       }
       if (elapsed - lastSave > 2) { save(); lastSave = elapsed; }
     }
-    rickshaw.group.position.set(car.x, 0.08, car.z); rickshaw.group.rotation.y = car.heading;
+    rickshaw.group.position.set(car.x, realWorld ? ROAD_SURFACE_Y : 0.08, car.z); rickshaw.group.rotation.y = car.heading;
     rickshaw.animate(paused ? 0 : car.speed, car.steering, elapsed);
     if (realWorld) realWorld.update(elapsed, camera.position, graphics.lowDetail); else world.update(elapsed, camera.position);
     landscape.update(camera.position);
@@ -407,7 +409,10 @@ try {
   console.error(error);
   element('loading').hidden = true;
   element('fatal-error').hidden = false;
-  element('fatal-error').textContent = isReal ? 'Unable to load the real Kottakkal map or 3D graphics. Your saved progress is safe. ' : 'Unable to start 3D graphics. Enable hardware acceleration or use a WebGL-capable browser, then reload. ';
+  const rejectedMap = error instanceof Error && error.message.startsWith('Invalid Kottakkal map:');
+  element('fatal-error').textContent = isReal
+    ? rejectedMap ? 'This map does not match the verified Kottakkal area or has invalid geometry. Your saved progress is safe. ' : 'Unable to load the real Kottakkal map or 3D graphics. Your saved progress is safe. '
+    : 'Unable to start 3D graphics. Enable hardware acceleration or use a WebGL-capable browser, then reload. ';
   if (isReal) {
     const fallback = document.createElement('a'); fallback.href = '?world=practice'; fallback.textContent = 'Open the original practice game';
     element('fatal-error').append(fallback);
