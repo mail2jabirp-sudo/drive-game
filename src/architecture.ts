@@ -1,8 +1,8 @@
 import * as THREE from 'three';
 import type {MapPoint,OsmBuilding} from './osm-types';
 import {pointInPolygon} from './osm-navigation';
-export type ArchitectureStyle='traditional'|'modern'|'apartment'|'commercial'|'institutional'|'worship';
-export interface ArchitecturePlan {style:ArchitectureStyle;ring:MapPoint[];center:MapPoint;height:number;wallHeight:number;rise:number;roof:'hipped'|'gabled'|'flat'|'dome';hash:number}
+export type ArchitectureStyle='traditional'|'modern'|'apartment'|'commercial'|'institutional'|'worship'|'office';
+export interface ArchitecturePlan {style:ArchitectureStyle;ring:MapPoint[];center:MapPoint;height:number;wallHeight:number;rise:number;roof:'hipped'|'gabled'|'flat'|'dome';hash:number;typology:'traditional-house'|'concrete-house'|'shop'|'mixed-use'|'office'|'apartment'|'public'|'worship'|'rural';variant:number;floors:number;appearanceSource:'regional-default';categorySource:'tag'|'inferred'}
 /** Illustrative architecture from verified footprints, not a surveyed facade/entrance. */
 export function architecturePlan(building:OsmBuilding):ArchitecturePlan {
  const ring=building.points.filter((p,i,list)=>i!==list.length-1||Math.hypot(p.x-list[0].x,p.z-list[0].z)>.02),center={x:ring.reduce((s,p)=>s+p.x,0)/ring.length,z:ring.reduce((s,p)=>s+p.z,0)/ring.length},height=Math.max(2.5,Math.min(40,building.height));
@@ -11,15 +11,22 @@ export function architecturePlan(building:OsmBuilding):ArchitecturePlan {
  const commercial=!!tags.shop||['retail','commercial','supermarket'].includes(kind)||['cafe','restaurant','marketplace'].includes(amenity);
  const institutional=['hospital','clinic','school','college','university','bus_station'].includes(amenity)||['hospital','school','college','transportation'].includes(kind);
  const worship=amenity==='place_of_worship'||!!tags.religion||['mosque','temple','church'].includes(kind);
- const style:ArchitectureStyle=worship?'worship':institutional?'institutional':commercial?'commercial':height>10||['apartments','office'].includes(kind)?'apartment':['house','residential'].includes(kind)||kind==='yes'&&hash%3===0?'traditional':'modern';
+ const office=!!tags.office||kind==='office';
+ const residential=['house','residential','detached','apartments'].includes(kind);
+ const apartment=kind==='apartments'||residential&&height>10;
+ const concrete=tags['roof:shape']==='flat'||tags['building:material']==='concrete';
+ const style:ArchitectureStyle=worship?'worship':institutional?'institutional':commercial?'commercial':office?'office':apartment?'apartment':!concrete&&height<=10&&(residential?hash%7!==3:kind==='yes'&&hash%3===0)?'traditional':'modern';
  const signs=ring.map((a,i)=>{const b=ring[(i+1)%ring.length],c=ring[(i+2)%ring.length];return Math.sign((b.x-a.x)*(c.z-b.z)-(b.z-a.z)*(c.x-b.x));}).filter(Boolean),convex=ring.length===4&&signs.length===4&&signs.every(s=>s===signs[0]);
  const diameter=Math.max(...ring.map(p=>Math.hypot(p.x-center.x,p.z-center.z)))*2;
  let roof:ArchitecturePlan['roof']='flat';
  if(convex&&diameter<35&&height<=12&&tags['roof:shape']!=='flat'){
   if(tags['roof:shape']==='dome')roof='dome';else if(tags['roof:shape']==='gabled')roof='gabled';else if(tags['roof:shape']==='hipped'||style==='traditional')roof='hipped';
  }
- const rise=roof==='flat'?.32:Math.min(2.2,height*.24);
- return {style,ring,center,height,wallHeight:height-rise,rise,roof,hash};
+ const rise=roof==='flat'?.32:Math.min(2.5,height*(.19+(hash%7)*.012));
+ const wallHeight=height-rise,taggedLevels=Number(tags['building:levels']);
+ const floors=Math.max(1,Math.min(8,Number.isFinite(taggedLevels)&&taggedLevels>=1?Math.min(Math.floor(taggedLevels),Math.floor(wallHeight/2.1)):Math.round(wallHeight/3)));
+ const typology:ArchitecturePlan['typology']=style==='traditional'?'traditional-house':style==='commercial'?(floors>1?'mixed-use':'shop'):style==='institutional'?'public':style==='modern'?(height<4.5&&diameter<18?'rural':'concrete-house'):style;
+ return {style,ring,center,height,wallHeight,rise,roof,hash,typology,variant:hash%12,floors,appearanceSource:'regional-default',categorySource:worship||institutional||commercial||office||residential?'tag':'inferred'};
 }
 export type ArchitectureLod='near'|'far'|false;
 export type ArchitectureAdd=(geometry:THREE.BufferGeometry,material:THREE.Material,point:MapPoint,lod:ArchitectureLod,tint?:THREE.Color)=>void;
@@ -35,9 +42,10 @@ class Parts {
 export function addArchitecture(building:OsmBuilding,materials:ArchitectureMaterials,add:ArchitectureAdd,heightAt:(x:number,z:number)=>number,frontFace:(a:MapPoint,b:MapPoint)=>number){
  const p=architecturePlan(building);if(p.ring.length<3)return p;
  const {ring,wallHeight,center}=p,base=heightAt(center.x,center.z),near=new Parts(),farPanels=new Parts(),roof=new Parts();
- const tint=new THREE.Color(['#e5d7bd','#d2ddd5','#e3d9ce','#d8c6b0','#e1e0d3','#d7c6b8'][p.hash%6]);
+ const tint=new THREE.Color(['#e5d7bd','#c8d8d1','#e3d9ce','#cbb89f','#e1e0d3','#d7c6b8','#d3d9c1','#c8cfd6','#e5d2c5','#c4c9bb','#ded8b7','#d6cbd8'][p.variant]);
+ const sourceColor=building.tags['building:colour'];if(sourceColor&&/^#[0-9a-f]{6}$/i.test(sourceColor))tint.set(sourceColor);
  if(p.style==='institutional')tint.set('#e0e5db');if(p.style==='commercial')tint.set(['#d8d2c2','#c9d3ce','#e3dbc5'][p.hash%3]);
- const tints=new Map([[materials.wall,tint]]);
+ const tints=new Map([[materials.wall,tint],[materials.roof,new THREE.Color(['#b97558','#a65e45','#be8061','#98604c'][p.hash%4])]]);
  const shape=new THREE.Shape(ring.map(q=>new THREE.Vector2(q.x,-q.z))),far=new THREE.ExtrudeGeometry(shape,{depth:wallHeight,bevelEnabled:false,steps:1});far.rotateX(-Math.PI/2);far.translate(0,base,0);const uv=far.getAttribute('uv');for(let i=0;i<uv.count;i++)uv.setXY(i,uv.getX(i)/3,uv.getY(i)/3);add(far,materials.wall,center,'far',tint);
  const faces=ring.map((a,i)=>({a,b:ring[(i+1)%ring.length],i,score:frontFace(a,ring[(i+1)%ring.length])})).sort((a,b)=>a.score-b.score),front=faces[0]?.i;
  for(let index=0;index<ring.length;index++){
@@ -55,18 +63,18 @@ export function addArchitecture(building:OsmBuilding,materials:ArchitectureMater
    quad([at(l,hi,face),at(r,hi,face),at(r,hi,back),at(l,hi,back)],mat);
    quad([at(l,lo,back),at(r,lo,back),at(r,lo,face),at(l,lo,face)],mat);
   };
-  const floors=Math.max(1,Math.min(8,Math.floor(wallHeight/2.85))),storey=wallHeight/floors,slots=length>=2.6?Math.min(6,Math.max(1,Math.floor((length-.8)/2.7))):0,cell=length/(slots||1);
+  const floors=p.floors,storey=wallHeight/floors,slots=length>=2.6?Math.min(6,Math.max(1,Math.floor((length-.8)/(2.5+(p.variant%4)*.25)))):0,cell=length/(slots||1);
   for(let level=0;level<floors;level++){
    const bottom=level*storey,top=(level+1)*storey,openings=[];
    for(let slot=0;slot<slots;slot++){
     const d=cell*(slot+.5),entry=index===front&&level===0&&slot===Math.floor(slots/2),commercial=p.style==='commercial'&&level===0;
     const loggia=index===front&&level===1&&slot===Math.floor(slots/2)&&['apartment','modern'].includes(p.style);
     const veranda=entry&&p.style==='traditional'&&cell>2.6;
-    const width=Math.min(cell*.73,commercial?2.6:veranda?2.7:loggia?2:entry?1.05:1.35),lo=bottom+(entry||commercial?.18:loggia?.32:1.05),hi=Math.min(top-.32,lo+(entry||commercial||veranda?2.3:loggia?2.15:1.25));
+    const width=Math.min(cell*.73,commercial?2.6:veranda?2.7:loggia?2:entry?1.05:1.05+(p.variant%4)*.15),lo=bottom+(entry||commercial?.18:loggia?.32:1.05),hi=Math.min(top-.32,lo+(entry||commercial||veranda?2.3:loggia?2.15:1.05+(p.variant%3)*.15));
     if(hi-lo<.45)continue;openings.push({l:d-width/2,r:d+width/2,lo,hi,d,width,entry,commercial,loggia,veranda});
    }
    let cursor=0;for(const o of openings){panel(cursor,o.l,bottom,top,0,materials.wall);panel(o.l,o.r,bottom,o.lo,0,materials.wall);panel(o.l,o.r,o.hi,top,0,materials.wall);cursor=o.r;
-    const recess=o.loggia||o.veranda?.5:.14,mat=o.entry?materials.door:o.commercial&&(p.hash+index)%3===0?materials.shutter:materials.glass;
+    const recess=o.loggia||o.veranda?.5:.12+(p.variant%3)*.035,mat=o.entry?materials.door:o.commercial&&(p.hash+index)%3===0?materials.shutter:materials.glass;
     panel(o.l,o.r,o.lo,o.hi,-recess,mat);farPanels.quad([at(o.l,o.lo,.018),at(o.r,o.lo,.018),at(o.r,o.hi,.018),at(o.l,o.hi,.018)],mat,undefined,sign===1);
     quad([at(o.l,o.lo),at(o.l,o.lo,-recess),at(o.l,o.hi,-recess),at(o.l,o.hi)],materials.concrete);
     quad([at(o.r,o.lo,-recess),at(o.r,o.lo),at(o.r,o.hi),at(o.r,o.hi,-recess)],materials.concrete);
@@ -80,6 +88,10 @@ export function addArchitecture(building:OsmBuilding,materials:ArchitectureMater
     else{box(o.d,(o.lo+o.hi)/2,.045,h-.1,.09,-recess+.05,frame);box(o.d,o.lo+h*.64,o.width-.08,.045,.09,-recess+.05,frame);}
     box(o.d,o.lo-.025,o.width+.12,.09,.2,-.06,materials.concrete);
     if(o.loggia){box(o.d,o.lo+.82,o.width-.08,.06,.06,-.025,materials.metal);for(let d=o.l+.15;d<o.r-.1;d+=.25)box(d,o.lo+.44,.035,.78,.04,-.025,materials.metal);}
+    // Recessed steps and shading remain inside the mapped envelope, never in a road setback.
+    if(o.entry)for(let step=0;step<2;step++)box(o.d,.045+step*.07,o.width-.12,.07,.14,-.09-step*.15,materials.concrete);
+    if(o.commercial||p.style==='office')box(o.d,o.hi-.05,o.width,.09,.38,-.17,materials.metal);
+    else if(p.style==='modern'&&!o.entry)box(o.d,o.hi-.04,o.width,.07,.24,-.1,materials.concrete);
     if(o.veranda){for(const d of [o.l+.16,o.r-.16])box(d,(o.lo+o.hi)/2,.14,h,.16,-.12,materials.wood);box(o.d,o.hi-.12,o.width,.15,.25,-.16,materials.wood);}
     if(p.style==='traditional'&&!o.entry&&!o.loggia&&o.l>.3&&o.r<length-.3){for(const side of [-1,1]){const d=side<0?o.l-.14:o.r+.14;box(d,(o.lo+o.hi)/2,.22,h,.045,-.015,materials.wood);for(let y=o.lo+.1;y<o.hi;y+=.18)quad([at(d-.09,y-.018,-.025),at(d+.09,y-.018,-.025),at(d+.09,y+.018,.025),at(d-.09,y+.018,.025)],materials.door);}}
    }panel(cursor,length,bottom,top,0,materials.wall);
@@ -105,7 +117,7 @@ export function addArchitecture(building:OsmBuilding,materials:ArchitectureMater
   const inward=(face:number[][])=>{const normal=new THREE.Vector3().fromArray(face[1]).sub(new THREE.Vector3().fromArray(face[0])).cross(new THREE.Vector3().fromArray(face[2]).sub(new THREE.Vector3().fromArray(face[0])));return normal.y+normal.x*(face.reduce((sum,v)=>sum+v[0],0)/face.length-center.x)+normal.z*(face.reduce((sum,v)=>sum+v[2],0)/face.length-center.z)<0;};
   for(const face of [[v[0],v[1],r1,r0],[v[2],v[3],r0,r1]])roof.quad(face,materials.roof,uv(face),inward(face));
   roof.triangle([v[1],v[2],r1],p.roof==='gabled'?materials.wall:materials.roof,uv([v[1],v[2],r1]),inward([v[1],v[2],r1]));roof.triangle([v[3],v[0],r0],p.roof==='gabled'?materials.wall:materials.roof,uv([v[3],v[0],r0]),inward([v[3],v[0],r0]));
-  const from=new THREE.Vector3(ra.x,base+p.height-.06,ra.z),to=new THREE.Vector3(rb.x,base+p.height-.06,rb.z),g=new THREE.CylinderGeometry(.065,.065,from.distanceTo(to),8);g.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,1,0),to.clone().sub(from).normalize()));g.translate(...from.clone().lerp(to,.5).toArray() as [number,number,number]);add(g,materials.roof,center,false);
+  const from=new THREE.Vector3(ra.x,base+p.height-.06,ra.z),to=new THREE.Vector3(rb.x,base+p.height-.06,rb.z),g=new THREE.CylinderGeometry(.065,.065,from.distanceTo(to),8);g.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,1,0),to.clone().sub(from).normalize()));g.translate(...from.clone().lerp(to,.5).toArray() as [number,number,number]);add(g,materials.roof,center,false,tints.get(materials.roof));
  }
  farPanels.flush(add,center,'far',tints);near.flush(add,center,'near',tints);roof.flush(add,center,false,tints);return p;
 }

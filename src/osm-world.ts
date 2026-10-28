@@ -3,6 +3,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { roadPieces } from './elevation';
 import { createTownMaterials } from './materials';
 import {addArchitecture} from './architecture';
+import {buildBuildingFrontages,frontageBlocks} from './building-frontage';
 import {createArchitectureMaterials} from './architecture-materials';
 import type { MapPoint, OsmMap, OsmRoad } from './osm-types';
 import { nearestRoad, pointInPolygon, segmentDistance, selectMissionStops } from './osm-navigation';
@@ -37,7 +38,7 @@ export function createOsmWorld(scene: THREE.Scene, data: OsmMap, missionOverride
   const roadsById=new Map(data.roads.map(road=>[road.id,road]));
   const heightAt = (x:number,z:number) => terrain?.heightAt(Math.max(data.bounds.minX,Math.min(data.bounds.maxX,x)),Math.max(data.bounds.minZ,Math.min(data.bounds.maxZ,z))) ?? 0;
   const wall = townMaterial('#c2c8ae'); wall.vertexColors = true;wall.name='Verified footprint facades';
-  const tiledRoof=townMaterial('#b76545');tiledRoof.side=THREE.DoubleSide;tiledRoof.name='Approximate Kerala tiled roofs';
+  const tiledRoof=townMaterial('#b76545');tiledRoof.side=THREE.DoubleSide;tiledRoof.vertexColors=true;tiledRoof.name='Approximate Kerala tiled roofs';
   const architecture=createArchitectureMaterials(wall,tiledRoof);
   const bark=new THREE.MeshStandardMaterial({color:'#77654c',roughness:1});bark.name='Decorative palm trunks';
   const poleMaterial=new THREE.MeshStandardMaterial({color:'#8d918a',roughness:1});poleMaterial.name='Decorative utility poles';
@@ -60,7 +61,7 @@ export function createOsmWorld(scene: THREE.Scene, data: OsmMap, missionOverride
   for(let i=0;i<groundUv.count;i++)groundUv.setXY(i,groundUv.getX(i)*groundWidth/4,groundUv.getY(i)*groundDepth/4);
   ground.receiveShadow=true;root.add(ground);
   interface Batch { geometries: THREE.BufferGeometry[]; material: THREE.Material; detail: boolean;lod?:'near'|'far' }
-  interface Chunk { group: THREE.Group; x: number; z: number; batches: Map<string, Batch>; radius: number; detail: THREE.Mesh[];architectural:Array<{mesh:THREE.Mesh;lod:'near'|'far'}>;architectureRadius:number }
+  interface Chunk { group: THREE.Group; x: number; z: number; batches: Map<string, Batch>; radius: number; detail: THREE.Mesh[];architectural:Array<{mesh:THREE.Mesh;lod:'near'|'far'}>;architectureRadius:number;nearArchitecture?:boolean }
   const chunks = new Map<string, Chunk>();
   const size = 160;
   const chunkAt = (x: number, z: number): Chunk => {
@@ -78,9 +79,9 @@ export function createOsmWorld(scene: THREE.Scene, data: OsmMap, missionOverride
     if (geometry !== plain) geometry.dispose();
     if (!plain.getAttribute('normal')) plain.computeVertexNormals();
     if (!plain.getAttribute('uv')) plain.setAttribute('uv', new THREE.Float32BufferAttribute(new Array(plain.getAttribute('position').count * 2).fill(0), 2));
-    if (tint) {
+    if (tint || (material as THREE.MeshStandardMaterial).vertexColors) {
       const colors: number[] = [];
-      for (let i = 0; i < plain.getAttribute('position').count; i++) colors.push(tint.r, tint.g, tint.b);
+      for (let i = 0; i < plain.getAttribute('position').count; i++) colors.push(tint?.r??1, tint?.g??1, tint?.b??1);
       plain.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
     }
     plain.computeBoundingBox();
@@ -180,10 +181,22 @@ export function createOsmWorld(scene: THREE.Scene, data: OsmMap, missionOverride
     const styled=poi?{...building,tags:{...building.tags,...(poi.kind==='shop'?{shop:building.tags.shop||'yes'}:{amenity:poi.kind})}}:building;
     addArchitecture(styled,architecture,addGeometry,heightAt,(a,b)=>nearestRoad(data.roads,{x:(a.x+b.x)/2,z:(a.z+b.z)/2})?.distance??Infinity);
   }
+  const frontageStops=missionOverride??selectMissionStops(data);
+  const frontages=buildBuildingFrontages(data,focus??frontageStops.spawn,[frontageStops.pickup,frontageStops.dropoff]).filter(part=>{const heights=part.points.map(p=>heightAt(p.x,p.z));return Math.max(...heights)-Math.min(...heights)<=.15;});
+  for(const part of frontages){
+    const center={x:part.points.reduce((v,p)=>v+p.x,0)/4,z:part.points.reduce((v,p)=>v+p.z,0)/4};
+    const base=Math.max(...part.points.map(p=>heightAt(p.x,p.z)));
+    // Skip cosmetic lots on steep/nonplanar support rather than float a wall.
+    if(base-Math.min(...part.points.map(p=>heightAt(p.x,p.z)))>.15)continue;
+    const shape=new THREE.Shape(part.points.map(p=>new THREE.Vector2(p.x,-p.z)));
+    const geometry=new THREE.ExtrudeGeometry(shape,{depth:part.height,bevelEnabled:false,steps:1});geometry.rotateX(-Math.PI/2);geometry.translate(0,base+.008,0);
+    addGeometry(geometry,part.kind==='fence'?architecture.metal:architecture.concrete,center,true);
+  }
   const isBlocked = (x: number, z: number, radius = 1.05): boolean => {
     if (x < data.bounds.minX + radius || x > data.bounds.maxX - radius || z < data.bounds.minZ + radius || z > data.bounds.maxZ - radius) return true;
     // Imported road centre geometry wins over imperfect overlapping footprint tags, keeping validated routes traversable.
     if (roadSurface(x, z)) return false;
+    if(frontageBlocks(frontages,{x,z},radius))return true;
     if (data.water.some(water => water.kind === 'area' && pointInPolygon({ x, z }, water.points))) return true;
     const candidates = new Set<typeof data.buildings[number]>();
     for (let ix = Math.floor((x - radius) / cellSize); ix <= Math.floor((x + radius) / cellSize); ix++) for (let iz = Math.floor((z - radius) / cellSize); iz <= Math.floor((z + radius) / cellSize); iz++) {
@@ -284,7 +297,9 @@ export function createOsmWorld(scene: THREE.Scene, data: OsmMap, missionOverride
         const distance = Math.hypot(cameraPosition.x - chunk.x, cameraPosition.z - chunk.z);
         chunk.group.visible = distance < (lowDetail ? 220 : 330) + chunk.radius;
         for (const detail of chunk.detail) detail.visible = detail.userData.roadDressing?(!lowDetail&&distance<205):(lowDetail?distance<110:distance<205);
-        const close=distance-Math.min(120,chunk.architectureRadius)<(lowDetail?55:115);
+        // A 6 m hysteresis band avoids near/far chatter without double-rendered facades.
+        const limit=(lowDetail?55:115)+(chunk.nearArchitecture?6:0);
+        const close=distance-Math.min(120,chunk.architectureRadius)<limit;chunk.nearArchitecture=close;
         for(const item of chunk.architectural)item.mesh.visible=item.lod==='near'?close:!close;
       }
       for (const sign of signs){

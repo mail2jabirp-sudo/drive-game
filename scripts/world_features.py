@@ -12,7 +12,7 @@ def features(projection):
     way_tags={w.attrib['id']:tags(w) for w in root.findall('way')}
     for building in data['buildings']:
         t=way_tags.get(building['id'],{})
-        building['tags'].update({k:v for k,v in t.items() if k.startswith('roof:') or k in ('religion','denomination','building:material')})
+        building['tags'].update({k:v for k,v in t.items() if k.startswith('roof:') or k in ('religion','denomination','building:material','building:colour','office')})
     for water in data['water']:
         t=way_tags.get(water['id'].split(':')[0],{});water['tags']=t
         if water['kind']=='stream':

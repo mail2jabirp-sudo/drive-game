@@ -20,3 +20,22 @@ test('facade normals face outside the footprint in either winding, avoiding self
   let checked=0;addArchitecture({...house,points},materials,(g,m,_p,lod)=>{if(m===materials.wall&&lod==='near'){const p=g.getAttribute('position'),n=g.getAttribute('normal');for(let i=0;i<p.count;i++){if(Math.abs(n.getY(i))>.01)continue;if(Math.abs(p.getZ(i))<.001&&Math.abs(n.getZ(i))>.99){assert.ok(n.getZ(i)<0);checked++;}if(Math.abs(p.getX(i))<.001&&Math.abs(n.getX(i))>.99){assert.ok(n.getX(i)<0);checked++;}}}g.dispose();},()=>0,()=>0);assert.ok(checked>0);
  }
 });
+
+test('regional variants are deterministic, honor category evidence and do not infer apartments from height alone',()=>{
+ const original=JSON.stringify(house),plans=Array.from({length:24},(_,i)=>architecturePlan({...house,id:String(i)}));
+ assert.ok(new Set(plans.map(p=>p.variant)).size>=8);assert.ok(plans.some(p=>p.style==='modern'));assert.ok(plans.some(p=>p.style==='traditional'));
+ assert.deepEqual(architecturePlan(house),architecturePlan(structuredClone(house)));assert.equal(JSON.stringify(house),original);
+ assert.equal(architecturePlan({...house,kind:'yes',height:20}).style,'modern');
+ assert.equal(architecturePlan({...house,kind:'yes',tags:{office:'accountant'}}).typology,'office');
+ assert.equal(architecturePlan({...house,kind:'apartments',height:14}).typology,'apartment');
+ assert.equal(architecturePlan({...house,tags:{shop:'yes','building:levels':'2'}}).typology,'mixed-use');
+ assert.equal(architecturePlan({...house,tags:{'roof:shape':'flat'}}).style,'modern');
+ assert.equal(architecturePlan(house).appearanceSource,'regional-default');
+ assert.equal(architecturePlan({...house,kind:'yes'}).categorySource,'inferred');
+});
+
+
+test('roof-pitch variants do not turn an untagged two-storey house into a double-height blank facade',()=>{
+ for(let i=0;i<50;i++){const plan=architecturePlan({...house,id:String(i),height:7});assert.equal(plan.floors,2);assert.ok(plan.wallHeight/plan.floors<=3.5);}
+ assert.equal(architecturePlan({...house,tags:{'building:levels':'1'}}).floors,1,'retain supported explicit storey evidence');
+});
