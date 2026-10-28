@@ -12,17 +12,18 @@ export async function createTraffic(scene:THREE.Scene,data:OsmMap,surface:Traffi
   if(input.version!==1||input.sourceSha256!==data.source.sha256||!Array.isArray(input.controls)||input.controls.some((c:ControlNode)=>!/^\d+$/.test(c.nodeId)||!['crossing','traffic_signals'].includes(c.kind)||![c.x,c.z].every(Number.isFinite)||c.x<data.bounds.minX||c.x>data.bounds.maxX||c.z<data.bounds.minZ||c.z>data.bounds.maxZ))throw new Error('Invalid traffic control data');controls=input.controls;
  }catch(error){available=false;console.warn('Traffic disabled safely; existing driving remains available.',error);}
  const obstacles=new TrafficObstacles();obstacles.update(data.buildings);
- let parked:PlayerPose|null=null;
- const sim=new TrafficSimulation({...surface,vehicleBlocked:(pose,spec)=>obstacles.blocked(pose,spec)||!!parked&&rectanglesOverlap({...pose,...spec},{...parked,width:1.9,length:3.2},.3)},controls);sim.enabled=available;sim.setRoads(data.roads);
+ let parked:Array<PlayerPose & {width:number;length:number}>=[];
+ const sim=new TrafficSimulation({...surface,vehicleBlocked:(pose,spec)=>obstacles.blocked(pose,spec)||parked.some(p=>rectanglesOverlap({...pose,...spec},p,.3))},controls);sim.enabled=available;sim.setRoads(data.roads);
  try{sim.density=readDensity(JSON.parse(localStorage.getItem('en3d.traffic.v1')??'{}').density??null);}catch{/* Optional traffic preference. */}
  try{sim.hour=Number(new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Kolkata',hour:'2-digit',hourCycle:'h23'}).format(new Date()));}catch{sim.hour=12;}
  const renderer=new TrafficRenderer(scene);
  return {sim,available,
-  setParkedVehicle(pose:PlayerPose|null){parked=pose;},
+  setParkedVehicle(pose:PlayerPose|null){parked=pose?[{...pose,width:1.9,length:3.2}]:[];},
+  setParkedVehicles(poses:Array<PlayerPose & {width:number;length:number}>){parked=poses;},
   blocksPedestrian:(x:number,z:number)=>sim.agents.some(a=>rectanglesOverlap({x,z,heading:0,width:.7,length:.7},{...a,...TRAFFIC[a.kind]},.2)),
   setDensity(density:Density){sim.density=density;try{localStorage.setItem('en3d.traffic.v1',JSON.stringify({density}));}catch{/* Optional preference only. */}},
   update(dt:number,player:PlayerPose,low:boolean,active:boolean){sim.setRoads(data.roads);obstacles.update(data.buildings);sim.town=data.buildings.length>20;sim.lowDetail=low;if(active)sim.update(dt,player);renderer.update(sim,player,surface.heightAt,low);},
-  blocksPlayer:(x:number,z:number,heading:number)=>sim.blocksPlayer(x,z,heading),clear:()=>sim.clear(),dispose:()=>renderer.dispose(),
+  blocksPlayer:(x:number,z:number,heading:number,width=1.8,length=3)=>sim.blocksPlayer(x,z,heading,width,length),clear:()=>sim.clear(),dispose:()=>renderer.dispose(),
   get status(){return !available?'Traffic unavailable · driving remains ready':`${sim.agents.length} nearby vehicles${sim.lowDetail?' · Battery saver cap 6':''}`;}
  };
 }

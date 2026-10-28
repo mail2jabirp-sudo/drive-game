@@ -27,18 +27,18 @@ export class GameAudio {
       }
     } catch { /* Unsupported or denied audio does not prevent play. */ }
   }
-  update(speed: number, active: boolean): void {
+  update(speed: number, active: boolean,base=35): void {
     if (!this.context || !this.engine || !this.engineGain) return;
     this.master?.gain.setTargetAtTime(this.muted?0:this.volume,this.context.currentTime,.08);
-    this.engine.frequency.setTargetAtTime(35 + Math.abs(speed) * 3, this.context.currentTime, 0.12);
+    this.engine.frequency.setTargetAtTime(base + Math.abs(speed) * (base>40?4:3), this.context.currentTime, 0.12);
     this.engineGain.gain.setTargetAtTime(active && !this.muted ? 0.018 : 0, this.context.currentTime, 0.1);
   }
   updateTraffic(agents:TrafficAgent[],camera:{x:number;y:number;z:number},forward:{x:number;y:number;z:number},active:boolean,dt:number){this.traffic?.update(agents,camera,forward,active,dt);}
   silence(){if(this.context){this.engineGain?.gain.setTargetAtTime(0,this.context.currentTime,.08);this.traffic?.silence();}}
-  diagnostics(){const data=new Float32Array(256);this.analyser?.getFloatTimeDomainData(data);return {state:this.context?.state??'uninitialized',rms:Math.sqrt(data.reduce((s,v)=>s+v*v,0)/data.length),traffic:this.traffic?.diagnostics()??null};}
-  horn(): void {
+  diagnostics(){const data=new Float32Array(256);this.analyser?.getFloatTimeDomainData(data);return {state:this.context?.state??'uninitialized',engineHz:this.engine?.frequency.value??0,rms:Math.sqrt(data.reduce((s,v)=>s+v*v,0)/data.length),traffic:this.traffic?.diagnostics()??null};}
+  horn(base=370): void {
     if (!this.context || this.muted) return;
-    for (const frequency of [370, 465]) this.tone(frequency, 0.25, 0.045, 'square');
+    for (const frequency of [base, base*1.257]) this.tone(frequency, 0.25, 0.045, 'square');
   }
   success(): void {
     if (!this.context || this.muted) return;

@@ -13,11 +13,12 @@ export interface DriveSurface {
   roadSurface: (x: number, z: number) => boolean;
   isBlocked: (x: number, z: number) => boolean;
 }
-export function advanceCar(car: DriveState, input: Controls, dt: number, boxes: Box[], surface?: DriveSurface): boolean {
+export interface DriveProfile {acceleration:number;braking:number;maxSpeed:number;reverse:number;steer:number;wheelbase:number}
+export function advanceCar(car: DriveState, input: Controls, dt: number, boxes: Box[], surface?: DriveSurface, profile?:DriveProfile): boolean {
   const oldSpeed = car.speed;
   const offroad = !(surface?.roadSurface ?? onRoad)(car.x, car.z);
-  if (input.throttle) car.speed += (car.speed < 0 ? 14 : 7) * dt;
-  if (input.brake) car.speed -= (car.speed > 0 ? 16 : 4) * dt;
+  if (input.throttle) car.speed += (car.speed < 0 ? 14 : profile?.acceleration??7) * dt;
+  if (input.brake) car.speed -= (car.speed > 0 ? profile?.braking??16 : 4) * dt;
   if (!input.throttle && !input.brake) car.speed = approach(car.speed, 0, (offroad ? 4.5 : 1.6) * dt);
   if (input.handbrake) car.speed = approach(car.speed, 0, 24 * dt);
   if(surface?.heightAt && !input.handbrake && Math.abs(car.speed)>0.05){
@@ -25,12 +26,12 @@ export function advanceCar(car: DriveState, input: Controls, dt: number, boxes: 
     const gradient=(surface.heightAt(car.x+dx*0.6,car.z+dz*0.6)-surface.heightAt(car.x-dx*0.6,car.z-dz*0.6))/1.2;
     car.speed-=9.81*Math.sin(Math.atan(gradient))*dt;
   }
-  car.speed = Math.max(-6, Math.min(offroad ? 9 : 22, car.speed));
-  const targetSteer = (Number(input.left) - Number(input.right)) * 0.52;
+  car.speed = Math.max(-(profile?.reverse??6), Math.min(offroad ? 9 : profile?.maxSpeed??22, car.speed));
+  const targetSteer = (Number(input.left) - Number(input.right)) * (profile?.steer??0.52);
   car.steering += (targetSteer - car.steering) * Math.min(1, dt * 9);
   // Bicycle model: front points down -Z; reversing naturally reverses steering.
   const steeringAtSpeed = car.steering / (1 + Math.abs(car.speed) * 0.055);
-  car.heading += car.speed / 2.4 * Math.tan(steeringAtSpeed) * dt;
+  car.heading += car.speed / (profile?.wheelbase??2.4) * Math.tan(steeringAtSpeed) * dt;
   const nx = car.x - Math.sin(car.heading) * car.speed * dt;
   const nz = car.z - Math.cos(car.heading) * car.speed * dt;
   if (surface ? surface.isBlocked(nx, nz) : blocked(nx, nz, boxes)) {

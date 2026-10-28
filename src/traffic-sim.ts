@@ -2,7 +2,7 @@ import type {MapPoint,OsmRoad} from './osm-types';
 import {DENSITY,TRAFFIC,eligible,signalPhase} from './traffic-types';
 import type {ControlNode,Density,TrafficAgent,TrafficEdge,TrafficKind} from './traffic-types';
 export interface TrafficSurface {roadSurface:(x:number,z:number)=>boolean;isBlocked:(x:number,z:number)=>boolean;vehicleBlocked?:(pose:MapPoint & {heading:number},spec:{length:number;width:number})=>boolean}
-export interface PlayerPose extends MapPoint {heading:number;speed:number}
+export interface PlayerPose extends MapPoint {heading:number;speed:number;width?:number;length?:number}
 const kinds=Object.keys(TRAFFIC) as TrafficKind[];
 const clamp=(x:number,a:number,b:number)=>Math.max(a,Math.min(b,x));
 const angle=(a:number)=>Math.atan2(Math.sin(a),Math.cos(a));
@@ -73,7 +73,7 @@ export class TrafficSimulation{
  }
  private overlaps(agent:Pick<TrafficAgent,'id'|'kind'|'x'|'z'|'heading'>,player:PlayerPose,margin=0.25){
   const box={...agent,...TRAFFIC[agent.kind]};
-  if(rectanglesOverlap(box,{...player,width:1.8,length:3.0},margin))return true;
+  if(rectanglesOverlap(box,{...player,width:player.width??1.8,length:player.length??3.0},margin))return true;
   return this.agents.some(other=>other.id!==agent.id&&rectanglesOverlap(box,{...other,...TRAFFIC[other.kind]},margin));
  }
  private spawn(player:PlayerPose){
@@ -137,7 +137,7 @@ export class TrafficSimulation{
     }
    }
    const forward={x:-Math.sin(a.heading),z:-Math.cos(a.heading)};
-   for(const b of [...this.agents.filter(b=>b.id!==a.id).map(b=>({...b,length:TRAFFIC[b.kind].length,width:TRAFFIC[b.kind].width})),{...player,length:3,width:1.8}]){
+   for(const b of [...this.agents.filter(b=>b.id!==a.id).map(b=>({...b,length:TRAFFIC[b.kind].length,width:TRAFFIC[b.kind].width})),{...player,length:player.length??3,width:player.width??1.8}]){
     const dx=b.x-a.x,dz=b.z-a.z,ahead=dx*forward.x+dz*forward.z,lateral=Math.abs(dx*forward.z-dz*forward.x);
     if(ahead>0&&lateral<(spec.width+b.width)/2+.35)stop(ahead-(spec.length+b.length)/2-3-a.speed*.8,'following');
    }
@@ -155,5 +155,5 @@ export class TrafficSimulation{
    a.stuck=a.speed<.1&&a.reason!=='signal'?a.stuck+dt:0;
   }
  }
- blocksPlayer(x:number,z:number,heading=0){return this.agents.some(a=>rectanglesOverlap({...a,...TRAFFIC[a.kind]},{x,z,heading,width:1.8,length:3},.05));}
+ blocksPlayer(x:number,z:number,heading=0,width=1.8,length=3){return this.agents.some(a=>rectanglesOverlap({...a,...TRAFFIC[a.kind]},{x,z,heading,width,length},.05));}
 }

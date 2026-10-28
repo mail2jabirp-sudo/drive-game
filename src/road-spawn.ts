@@ -3,11 +3,11 @@ import {segmentDistance} from './osm-navigation';
 import {TrafficObstacles} from './traffic-obstacles';
 export type RoadPose=MapPoint & {heading:number};
 /** Repair a position, never the wallet, passenger state or archived save. */
-export function roadSpawn(data:OsmMap,surface:{roadSurface:(x:number,z:number)=>boolean;isBlocked:(x:number,z:number)=>boolean},desired:RoadPose):RoadPose {
+export function roadSpawn(data:OsmMap,surface:{roadSurface:(x:number,z:number)=>boolean;isBlocked:(x:number,z:number)=>boolean},desired:RoadPose,spec={width:1.8,length:3}):RoadPose {
  const obstacles=new TrafficObstacles();obstacles.update(data.buildings);
  const fits=(pose:RoadPose)=>{
-  if(![pose.x,pose.z,pose.heading].every(Number.isFinite)||obstacles.blocked(pose,{width:1.8,length:3}))return false;
-  for(const x of [-.9,0,.9])for(const z of [-1.5,0,1.5]){
+  if(![pose.x,pose.z,pose.heading].every(Number.isFinite)||obstacles.blocked(pose,spec))return false;
+  for(const x of [-spec.width/2,0,spec.width/2])for(const z of [-spec.length/2,0,spec.length/2]){
    const px=pose.x+Math.cos(pose.heading)*x+Math.sin(pose.heading)*z,pz=pose.z-Math.sin(pose.heading)*x+Math.cos(pose.heading)*z;
    if(!surface.roadSurface(px,pz)||surface.isBlocked(px,pz))return false;
   }
