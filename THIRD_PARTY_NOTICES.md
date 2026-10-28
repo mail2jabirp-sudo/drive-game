@@ -125,3 +125,7 @@ THE SOFTWARE.
 ## Playable fleet additions
 
 `src/road-vehicle.ts` contains original MIT procedural compact hatchback, sedan taxi and van geometry; it does not import a manufacturer model or reference photograph. `src/fleet.ts` supplies game handling dimensions and source-road vehicle placement. Engine/horn profiles in `src/audio.ts` are synthesized substitutes, not authentic vehicle sound recordings. No additional third-party models, recordings, paid assets or dependencies were introduced. Geographic roads remain separately licensed as stated above.
+
+## Footprint-adapted architecture detail increment
+
+`src/architecture.ts` and `src/architecture-materials.ts` contain original procedural mesh and texture-generation code under the repository MIT licence. Plaster, terracotta, timber, stone and shutter color/normal/roughness channels are synthesized locally at 256px; there are no downloaded building models, photographed textures or new dependencies. Underlying OpenStreetMap footprint geometry remains ODbL as documented in DATA_LICENSES.md. Architectural facades, inferred roof treatments and entrance positions are illustrative, not surveyed replicas.

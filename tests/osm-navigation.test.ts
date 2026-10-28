@@ -47,18 +47,18 @@ test('exact polygon collision avoids the false walls made by footprint bounding 
   assert.equal(segmentDistance({x:2,z:3},{x:0,z:0},{x:4,z:0}).distance,3);
 });
 test('OSM world extrudes footprints north/south correctly, supports metre roads and culls detail',()=>{
-  const fixture:OsmMap={...source,roads:[road('r',['a','b','c'],[{x:0,z:0},{x:200,z:0},{x:400,z:0}])],buildings:[{id:'b',name:'',kind:'yes',height:9,heightSource:'tag',tags:{},points:[{x:50,z:30},{x:70,z:30},{x:70,z:45},{x:50,z:45}]}],landmarks:[],water:[],intersections:[]};
+  const fixture:OsmMap={...source,roads:[road('r',['a','b','c'],[{x:0,z:0},{x:200,z:0},{x:400,z:0}])],buildings:[{id:'b',name:'',kind:'house',height:9,heightSource:'tag',tags:{},points:[{x:50,z:30},{x:70,z:30},{x:70,z:45},{x:50,z:45}]}],landmarks:[],water:[],intersections:[]};
   const {scene,world}=createFixture(fixture);scene.updateMatrixWorld(true);
   let wallBounds:THREE.Box3|undefined;
-  scene.traverse(object=>{if(object instanceof THREE.Mesh&&(object.material as THREE.Material).name==='Verified footprint facades')wallBounds=new THREE.Box3().setFromObject(object);});
+  scene.traverse(object=>{if(object instanceof THREE.Mesh&&(object.material as THREE.Material).name==='Architectural plaster PBR'&&object.userData.architectureLod==='far')wallBounds=new THREE.Box3().setFromObject(object);});
   assert.ok(wallBounds);
   assert.equal(wallBounds.min.x,50);assert.equal(wallBounds.max.x,70);
   assert.equal(wallBounds.min.z,30);assert.equal(wallBounds.max.z,45);
   assert.ok(Math.abs(wallBounds.min.y)<1e-6);assert.ok(wallBounds.max.y>0&&wallBounds.max.y<9);
   let roofBounds:THREE.Box3|undefined;
-  scene.traverse(object=>{if(object instanceof THREE.Mesh&&(object.material as THREE.Material).name==='Approximate Kerala tiled roofs')roofBounds=new THREE.Box3().setFromObject(object);});
+  scene.traverse(object=>{if(object instanceof THREE.Mesh&&(object.material as THREE.Material).name==='Architectural terracotta PBR')roofBounds=new THREE.Box3().setFromObject(object);});
   assert.ok(roofBounds);assert.equal(roofBounds.min.x,50);assert.equal(roofBounds.max.x,70);assert.equal(roofBounds.min.z,30);assert.equal(roofBounds.max.z,45);
-  assert.ok(Math.abs(roofBounds.max.y-9.025)<1e-4,'roof retains the mapped total building height');
+  assert.ok(Math.abs(roofBounds.max.y-9.005)<1e-4,'roof retains the mapped total building height');
   assert.ok(roofBounds.min.y>=wallBounds.max.y,'roof meets the façade without descending through it');
   assert.equal(world.isBlocked(60,35),true);assert.equal(world.isBlocked(60,0),false);
   assert.equal(world.roadSurface(100,2),true);assert.equal(world.roadSurface(100,20),false);
@@ -91,14 +91,15 @@ test('optional terrain places road pavement, junction discs and ground in the sa
   const fixture:OsmMap={...source,roads:[road('slope',['a','b','c'],[{x:0,z:0},{x:100,z:0},{x:200,z:100}])],buildings:[],landmarks:[],water:[],intersections:[]};
   const heightAt=(x:number,z:number)=>x*0.1+z*0.05;
   const {scene,world}=createFixture(fixture,{heightAt});
-  let ground=false,roadVertices=0;
+  let ground=false,roadVertices=0;scene.updateMatrixWorld(true);
   scene.traverse(object=>{
     if(!(object instanceof THREE.Mesh))return;
     const positions=object.geometry.getAttribute('position');
     if(object.name==='DEM terrain surface'){ground=true;assert.ok(positions.count>6000);return;}
     if((object.material as THREE.Material).name.startsWith('Decorative '))return;
     for(let i=0;i<positions.count;i++){
-      const x=positions.getX(i),z=positions.getZ(i),height=positions.getY(i);
+      const point=object.localToWorld(new THREE.Vector3(positions.getX(i),positions.getY(i),positions.getZ(i)));
+      const x=point.x,z=point.z,height=point.y;
       assert.ok(Math.abs(height-heightAt(x,z))<0.05,'rendered roads and joins follow sampled metre heights');
       roadVertices++;
     }
