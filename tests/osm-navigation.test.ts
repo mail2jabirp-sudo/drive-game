@@ -91,14 +91,15 @@ test('optional terrain places road pavement, junction discs and ground in the sa
   const fixture:OsmMap={...source,roads:[road('slope',['a','b','c'],[{x:0,z:0},{x:100,z:0},{x:200,z:100}])],buildings:[],landmarks:[],water:[],intersections:[]};
   const heightAt=(x:number,z:number)=>x*0.1+z*0.05;
   const {scene,world}=createFixture(fixture,{heightAt});
-  let ground=false,roadVertices=0;
+  let ground=false,roadVertices=0;scene.updateMatrixWorld(true);
   scene.traverse(object=>{
     if(!(object instanceof THREE.Mesh))return;
     const positions=object.geometry.getAttribute('position');
     if(object.name==='DEM terrain surface'){ground=true;assert.ok(positions.count>6000);return;}
     if((object.material as THREE.Material).name.startsWith('Decorative '))return;
     for(let i=0;i<positions.count;i++){
-      const x=positions.getX(i),z=positions.getZ(i),height=positions.getY(i);
+      const point=object.localToWorld(new THREE.Vector3(positions.getX(i),positions.getY(i),positions.getZ(i)));
+      const x=point.x,z=point.z,height=point.y;
       assert.ok(Math.abs(height-heightAt(x,z))<0.05,'rendered roads and joins follow sampled metre heights');
       roadVertices++;
     }

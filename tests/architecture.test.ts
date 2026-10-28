@@ -14,3 +14,9 @@ test('true recessed facade geometry and roof LOD preserve source coordinates, he
   let triangles=0,recessed=0;for(const {g,lod} of parts){g.computeBoundingBox();const b=g.boundingBox!;assert.ok(b.min.x>=-.05&&b.max.x<=12.05);assert.ok(b.min.z>=-.05&&b.max.z<=9.05);assert.ok(b.min.y>=-.05&&b.max.y<=7.55);const positions=g.getAttribute('position');triangles+=(g.index?.count??positions.count)/3;for(let i=0;i<positions.count;i++){assert.ok([positions.getX(i),positions.getY(i),positions.getZ(i)].every(Number.isFinite));if(lod==='near'&&positions.getZ(i)>.1&&positions.getZ(i)<.55)recessed++;}g.dispose();}assert.ok(recessed>0);assert.ok(triangles<6500,`${triangles} triangles exceeds house budget`);
  }
 });
+
+test('facade normals face outside the footprint in either winding, avoiding self-shadow acne',()=>{
+ for(const points of [house.points,[...house.points].reverse()]){
+  let checked=0;addArchitecture({...house,points},materials,(g,m,_p,lod)=>{if(m===materials.wall&&lod==='near'){const p=g.getAttribute('position'),n=g.getAttribute('normal');for(let i=0;i<p.count;i++){if(Math.abs(n.getY(i))>.01)continue;if(Math.abs(p.getZ(i))<.001&&Math.abs(n.getZ(i))>.99){assert.ok(n.getZ(i)<0);checked++;}if(Math.abs(p.getX(i))<.001&&Math.abs(n.getX(i))>.99){assert.ok(n.getX(i)<0);checked++;}}}g.dispose();},()=>0,()=>0);assert.ok(checked>0);
+ }
+});

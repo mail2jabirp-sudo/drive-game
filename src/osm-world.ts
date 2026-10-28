@@ -234,7 +234,11 @@ export function createOsmWorld(scene: THREE.Scene, data: OsmMap, missionOverride
   for (const chunk of chunks.values()) for (const batch of chunk.batches.values()) {
     const geometry = mergeGeometries(batch.geometries, false);
     if (!geometry) throw new Error('Unable to combine OSM geometry.');
-    const mesh = new THREE.Mesh(geometry, batch.material); mesh.receiveShadow = true; mesh.castShadow = Object.values(architecture).includes(batch.material);
+    // Keep GPU vertex coordinates local: large OSM world coordinates otherwise
+    // lose derivative/shadow precision on detailed PBR facades. World transforms
+    // preserve the original geographic placement and collision coordinates.
+    geometry.translate(-chunk.x,0,-chunk.z);
+    const mesh = new THREE.Mesh(geometry, batch.material);mesh.position.set(chunk.x,0,chunk.z); mesh.receiveShadow = true; mesh.castShadow = Object.values(architecture).includes(batch.material);
     mesh.userData.architectureLod=batch.lod;chunk.group.add(mesh); if (batch.detail) chunk.detail.push(mesh);if(batch.lod)chunk.architectural.push({mesh,lod:batch.lod});
     for (const geometry of batch.geometries) geometry.dispose(); batch.geometries.length = 0;
   }

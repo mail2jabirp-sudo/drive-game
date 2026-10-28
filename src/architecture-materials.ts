@@ -22,7 +22,7 @@ export function createArchitectureMaterials(wall:THREE.MeshStandardMaterial,clay
   for(const t of [color,normal,roughness]){t.wrapS=t.wrapT=THREE.RepeatWrapping;t.anisotropy=4;}return {map:color,normalMap:normal,roughnessMap:roughness};
  };
  const plaster=make('plaster'),tile=make('tile'),wood=make('wood'),stone=make('stone'),metal=make('metal');
- wall.map?.dispose();wall.map=plaster.map;wall.normalMap=plaster.normalMap;wall.roughnessMap=plaster.roughnessMap;wall.normalScale.set(.2,.2);wall.side=THREE.DoubleSide;wall.name='Architectural plaster PBR';
+ wall.map?.dispose();wall.map=plaster.map;wall.normalMap=plaster.normalMap;wall.roughnessMap=plaster.roughnessMap;wall.normalScale.set(.2,.2);wall.side=THREE.DoubleSide;wall.shadowSide=THREE.BackSide;wall.name='Architectural plaster PBR';
  clay.map?.dispose();Object.assign(clay,tile);clay.normalScale.set(.65,.65);clay.name='Architectural terracotta PBR';clay.side=THREE.DoubleSide;
  const material=(name:string,color:string,channels:ReturnType<typeof make>|null,roughness=.8,metalness=0)=>{const m=new THREE.MeshStandardMaterial({name,color,roughness,metalness,side:THREE.DoubleSide,...channels});m.normalScale.set(.35,.35);return m;};
  return {wall,roof:clay,wood:material('Architectural teak PBR','#755139',wood),door:material('Architectural timber doors','#523b2b',wood),concrete:material('Architectural stone and concrete','#c4c3b4',stone),metal:material('Architectural metal frames','#43504a',null,.4,.45),shutter:material('Architectural corrugated shutters','#77827b',metal,.65,.35),glass:material('Architectural recessed glazing','#354b50',null,.18,.25)};
