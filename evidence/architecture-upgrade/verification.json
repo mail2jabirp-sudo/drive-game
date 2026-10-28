@@ -1,0 +1,86 @@
+{
+  "testedSourceCommit": "087d8f50a861303ffbddbe9e0d72bfe13b093ce1",
+  "baselineCommit": "fa4a0972fbac6355e9d0ad0042e0b0ad40c0ba34",
+  "unitTestsPassed": 76,
+  "browserTestsPassed": 35,
+  "productionBrowserTestsPassed": 7,
+  "productionBuildPassed": true,
+  "cameraComparison": {
+    "viewport": [
+      1280,
+      800
+    ],
+    "deviceScaleFactor": 0.75,
+    "quality": "low",
+    "checks": [
+      {
+        "name": "start",
+        "cameraMatched": true,
+        "poseMatched": true,
+        "actual": {
+          "car": {
+            "x": -8877.861,
+            "z": 5944.024938092935,
+            "heading": -3.141592653589793,
+            "speed": 0,
+            "steering": 0
+          },
+          "position": [
+            -8877.861,
+            4.5992895730978836,
+            5937.640613739845
+          ],
+          "quaternion": [
+            0.0011223939215613636,
+            0.9928149256114941,
+            0.1192895733196317,
+            -0.009341381704467468
+          ],
+          "fov": 56
+        }
+      },
+      {
+        "name": "outskirts",
+        "cameraMatched": true,
+        "poseMatched": true,
+        "actual": {
+          "car": {
+            "x": -9481.413078348796,
+            "z": 7206.489534211228,
+            "heading": 2.139397458864283,
+            "speed": 0,
+            "steering": 0
+          },
+          "position": [
+            -9473.857722426515,
+            4.406021033415111,
+            7201.7068441683605
+          ],
+          "quaternion": [
+            -0.04548521936089107,
+            0.8711251772603609,
+            0.08220784629744113,
+            0.4819895127177901
+          ],
+          "fov": 56
+        }
+      }
+    ]
+  },
+  "builtAssetSha256": {
+    "dist/assets/index-CMd6WA7M.js": "f3ff5d0a0d3e3df7a1b3bf500336f87e950323747ba94339af94ae114dc40a09",
+    "dist/assets/index-Z46yT4Ql.css": "6fba74e701575e9cf0388b49cb6f84a31382a4e658a1f9c7714deb2a25d490d6"
+  },
+  "screenshotSha256": {
+    "outskirts-before.png": "036313cf73c144e72c3fc9cc2daf0e3051e2eecadd2af8fe55cbfcc51618fc3d",
+    "walking-facade.png": "aeeba280ab115da1debd72105eb36a01d92c4b081a5c97165969095f5f1af60f",
+    "start-after.png": "bf09715ea9ed01fb7b2b551b585938f3fa7d0df3c55ee570fd1cca1041795878",
+    "outskirts-after.png": "36bb9b7be0bfc2f5ef27255b86f6a8427158071501a7848ed8799e8e5ab88b20",
+    "walking-high.png": "db273dd394829ba3316842b1688eb9f479882599035291748190b9307e3ab31f",
+    "start-before.png": "db1a6394e9b62bc34c6a09c99db2f53c688a9077056c6681012fcca3096115b2"
+  },
+  "renderer": "software Chromium; no real-device FPS benchmark",
+  "assetType": "original MIT procedural building geometry and generated PBR textures; no external GLB",
+  "liveProductionVerified": false,
+  "liveVerificationLimitation": "Production host HTTPS CONNECT denied by active environment proxy; deployment status checked separately."
+}
