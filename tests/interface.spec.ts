@@ -8,7 +8,7 @@ test('cinematic menu has live source-road traffic, keyboard-accessible actions a
  await expect.poll(()=>page.evaluate(()=>(window as any).__gameTest.traffic.sim.agents.some((a:any)=>a.distance>1))).toBe(true);
  const second=await page.evaluate(()=>{const t=(window as any).__gameTest;return {camera:t.camera.position.toArray(),car:{...t.car}};});expect(second.camera).not.toEqual(first.camera);expect(second.car.x).toBe(first.car.x);expect(second.car.z).toBe(first.car.z);
  await page.locator('#start-screen [data-panel="controls"]').click();await expect(page.locator('#controls-dialog')).toBeVisible();await expect(page.locator('#controls-dialog')).toContainText('Change camera');await page.keyboard.press('Escape');await expect(page.locator('#controls-dialog')).not.toBeVisible();
- await page.locator('#start-screen [data-panel="vehicles"]').click();await expect(page.locator('#vehicles-dialog')).toBeVisible();await expect(page.locator('#vehicles-dialog')).toContainText('not available yet');await page.locator('#vehicles-dialog [data-close]').click();
+ await page.locator('#start-screen [data-panel="vehicles"]').click();await expect(page.locator('#vehicles-dialog')).toBeVisible();await expect(page.locator('#vehicles-dialog')).toContainText('Four owned playable vehicles');await page.locator('#vehicles-dialog [data-close]').click();
  await page.locator('#start-button').focus();await page.keyboard.press('Space');await expect(page.locator('#start-screen')).toBeHidden();expect(errors).toEqual([]);
 });
 
