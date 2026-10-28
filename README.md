@@ -30,9 +30,11 @@ Playwright uses `/usr/bin/chromium`, or set `CHROMIUM_PATH`. Build output is `di
 ## Controls and gameplay
 
 - W / up: accelerate. S / down: brake, then reverse. A/D or arrows: steer. Space: handbrake.
+- F: exit a stopped vehicle / enter an available nearby owned vehicle. On foot: WASD walks, Shift (touch RUN) runs. C changes driving camera or rotates walking view.
+- Four playable types: passenger auto, compact hatchback, sedan taxi and Kerala-style van. Parked vehicles keep separate saved poses. Eligible cars have a taxi-availability toggle; the van is free-driving only. See [Vehicle switching](VEHICLE_SWITCHING.md) for placement, save compatibility, evidence and limitations.
 - E: board/deliver a nearby passenger while stopped. H: horn. P / Escape: pause. R: return to the known source-road starting stop.
 - Mobile has touch steering, pedals, horn, interaction and reset buttons. Display settings retain Auto and Battery Saver quality.
-- Passenger trips earn ₹120. Wallet, trips, passenger, pose and tea counters save automatically. The existing ₹10 tea interaction is available at an authored game stopping point on a mapped road near a mapped Kottakkal cafe; this does not assert its current menu, entrance or exact parking bay.
+- Passenger trips earn a flat ₹120 game fare (not the official Kerala fare). Wallet, trips, passenger, pose and tea counters save automatically. The existing ₹10 tea interaction is available at an authored game stopping point on a mapped road near a mapped Kottakkal cafe; this does not assert its current menu, entrance or exact parking bay.
 
 The old practice save pose and original `osmRide` remain archived in the same localStorage record. Existing export rides retain geographic coordinates. A prior Kottakkal ride reprojects into the district frame, retaining heading/passenger and wallet. Fictional practice coordinates are not misrepresented as geographic coordinates; its earnings/counters and passenger phase carry forward while its pose remains archived. A source failure offers retry of the same district, never a fictional replacement world.
 

@@ -1,0 +1,31 @@
+{
+  "testedCodeCommit": "09074c40004c87e592c66ccd80552e301eeb83b0",
+  "checks": {
+    "unit": 70,
+    "browser": 31,
+    "compiledProduction": 7,
+    "typeScriptBuild": "passed",
+    "sourceMapIntegrity": "passed"
+  },
+  "assets": {
+    "/assets/index-D6fGKujh.css": {
+      "bytes": 23796,
+      "sha256": "e84031b397ceb9b8e53f7c3094728a307c212e53512af2131dda5c627ad20ebf"
+    },
+    "/assets/index-WyhCxmuX.js": {
+      "bytes": 664619,
+      "sha256": "4267ccb7fcb84bedda5c59abea49c4823fd605f2a88bf344b6a8ef7c73233444"
+    }
+  },
+  "live": {
+    "url": "https://drive-game-beta.vercel.app/",
+    "verified": false,
+    "error": "curl: (56) CONNECT tunnel failed, response 403"
+  },
+  "limits": {
+    "residentRoadTiles": 9,
+    "playerFleetModels": 4,
+    "aiTrafficCap": 18,
+    "hardwareFPSMeasured": false
+  }
+}
