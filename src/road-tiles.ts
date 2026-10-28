@@ -6,7 +6,7 @@ export interface RoadManifest {
   legacyProjection?:OsmMap['projection'];legacySourceHash?:string;teaStop?:MapPoint & {name:string;source:string};
   stats:Record<string,number>; origin:{wayId:string;nodeId:string;name:string};
 }
-export interface RoadTile {version:1;roads:OsmRoad[];buildings?:OsmMap['buildings'];landmarks?:OsmMap['landmarks'];water?:OsmMap['water']}
+export interface RoadTile {version:1;roads:OsmRoad[];buildings?:OsmMap['buildings'];landmarks?:OsmMap['landmarks'];water?:OsmMap['water'];landuse?:OsmMap['landuse']}
 export function nearbyTileKeys(manifest:RoadManifest, point:MapPoint):string[] {
   const ix=Math.floor(point.x/manifest.tileSize),iz=Math.floor(point.z/manifest.tileSize);
   const result:string[]=[];
@@ -39,7 +39,8 @@ export class RoadTileStore {
   hasPosition(x:number,z:number):boolean{return this.resident.has(`${Math.floor(x/this.manifest.tileSize)},${Math.floor(z/this.manifest.tileSize)}`);}
   features(){
     const tiles=[...this.resident.values()];
-    return {roads:this.roads(),buildings:tiles.flatMap(t=>t.buildings??[]),landmarks:tiles.flatMap(t=>t.landmarks??[]),water:tiles.flatMap(t=>t.water??[])};
+    const unique=<T extends {id:string}>(items:T[])=>[...new Map(items.map(p=>[p.id,p])).values()];
+    return {roads:this.roads(),buildings:unique(tiles.flatMap(t=>t.buildings??[])).filter(b=>!b.renderExcludedReason),landmarks:unique(tiles.flatMap(t=>t.landmarks??[])),water:unique(tiles.flatMap(t=>t.water??[])),landuse:unique(tiles.flatMap(t=>t.landuse??[]))};
   }
   roads():OsmRoad[] {
     const seen=new Set<string>();const roads:OsmRoad[]=[];

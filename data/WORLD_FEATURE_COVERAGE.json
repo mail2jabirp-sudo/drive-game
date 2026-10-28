@@ -1,0 +1,43 @@
+{
+  "counts": {
+    "buildings": 4673,
+    "landmarks": 584,
+    "water": 205,
+    "landuse": 65
+  },
+  "renderableBuildings": 4362,
+  "landmarksByKind": {
+    "school": 74,
+    "shop": 309,
+    "place_of_worship": 58,
+    "hospital": 32,
+    "restaurant": 20,
+    "clinic": 11,
+    "bank": 29,
+    "marketplace": 4,
+    "cafe": 13,
+    "fuel": 8,
+    "pharmacy": 5,
+    "townhall": 1,
+    "police": 2,
+    "bus_stop": 16,
+    "bus_station": 1,
+    "college": 1
+  },
+  "waterByKind": {
+    "stream": 91,
+    "area": 114
+  },
+  "landuseByKind": {
+    "farmland": 53,
+    "farmyard": 6,
+    "grassland": 3,
+    "plant_nursery": 1,
+    "grass": 1,
+    "wood": 1
+  },
+  "signalsByKind": {
+    "crossing": 96,
+    "traffic_signals": 10
+  }
+}

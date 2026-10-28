@@ -37,6 +37,7 @@ export function createOsmWorld(scene: THREE.Scene, data: OsmMap, missionOverride
   const poleMaterial=new THREE.MeshStandardMaterial({color:'#8d918a',roughness:1});poleMaterial.name='Decorative utility poles';
   const grass=new THREE.MeshStandardMaterial({color:'#81925d',side:THREE.DoubleSide,roughness:1});grass.name='Decorative grass';
   const leaves=new THREE.MeshStandardMaterial({color:'#3e7046',roughness:1,side:THREE.DoubleSide});leaves.name='Decorative palm crowns';
+  const bridgeRail=new THREE.MeshStandardMaterial({color:'#b6b5a4',roughness:.8});bridgeRail.name='Mapped bridge rail artwork';
   const roadPaint = new THREE.MeshStandardMaterial({ color: '#d2ccaf', roughness: 1 });
   const waterMaterial = new THREE.MeshStandardMaterial({ color: '#5f9290', roughness: 0.35, metalness: 0.1, side: THREE.DoubleSide });
   const centerX=(data.bounds.minX+data.bounds.maxX)/2,centerZ=(data.bounds.minZ+data.bounds.maxZ)/2;
@@ -102,6 +103,10 @@ export function createOsmWorld(scene: THREE.Scene, data: OsmMap, missionOverride
     // Order above faces up for both north- and east-bound segments.
     return geometry;
   }
+  // Closed source land-use polygons, not invented crop locations or field boundaries.
+  const agricultural=new THREE.MeshStandardMaterial({color:'#a2ab70',roughness:1,side:THREE.DoubleSide});agricultural.name='Mapped agricultural landuse';
+  const naturalLand=new THREE.MeshStandardMaterial({color:'#6f8e5e',roughness:1,side:THREE.DoubleSide});naturalLand.name='Mapped natural landuse';
+  for(const area of data.landuse??[]){if(area.points.length<3)continue;const geometry=flatShape(area.points,.004),positions=geometry.getAttribute('position');if(terrain){for(let i=0;i<positions.count;i++)positions.setY(i,.004+heightAt(positions.getX(i),positions.getZ(i)));geometry.computeVertexNormals();}addGeometry(geometry,['farmland','farmyard','orchard','plant_nursery'].includes(area.kind)?agricultural:naturalLand,area.points[0]);}
   interface Segment { a: MapPoint; b: MapPoint; road: OsmRoad }
   const segmentCells = new Map<string, Segment[]>();
   const cellSize = 32;
@@ -122,6 +127,9 @@ export function createOsmWorld(scene: THREE.Scene, data: OsmMap, missionOverride
       if(['trunk','primary','secondary','tertiary'].includes(road.highway)) addGeometry(lineQuad(piece.a,piece.b,road.width+1.2,y-0.009),shoulder,middlePiece);
       addGeometry(lineQuad(piece.a,piece.b,road.width,y),roadMaterial,middlePiece);
     }
+    // Bridge position/alignment is mapped; these flat-deck rails are approximate
+    // artwork, not surveyed bridge clearance or a substitute for missing DEM.
+    if(road.bridge){const dx=b.x-a.x,dz=b.z-a.z,length=Math.hypot(dx,dz);if(length>.05)for(const side of [-1,1]){const ox=-dz/length*(road.width/2+.15)*side,oz=dx/length*(road.width/2+.15)*side;for(const level of [.45,.85]){const from=new THREE.Vector3(a.x+ox,heightAt(a.x,a.z)+level,a.z+oz),to=new THREE.Vector3(b.x+ox,heightAt(b.x,b.z)+level,b.z+oz),g=new THREE.CylinderGeometry(.045,.045,from.distanceTo(to),5);g.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,1,0),to.clone().sub(from).normalize()));g.translate(...from.clone().lerp(to,.5).toArray() as [number,number,number]);addGeometry(g,bridgeRail,middle);}}}
     const join=(p:MapPoint)=>{
       // Round only the rendered pavement buffer: source centre lines and node IDs
       // stay exact. Matching verge joins prevent sharp shoulder holes at bends.
@@ -216,7 +224,7 @@ export function createOsmWorld(scene: THREE.Scene, data: OsmMap, missionOverride
     if (water.points.length < 2) continue;
     const middle = water.points[Math.floor(water.points.length / 2)];
     if (water.kind === 'area' && water.points.length >= 3) addGeometry(flatShape(water.points, 0.012), waterMaterial, middle);
-    else for (let i = 1; i < water.points.length; i++) addGeometry(lineQuad(water.points[i - 1], water.points[i], 2, 0.012), waterMaterial, middle);
+    else for (let i = 1; i < water.points.length; i++) addGeometry(lineQuad(water.points[i - 1], water.points[i], water.width??2, 0.012), waterMaterial, middle);
   }
   // Decorative Kerala roadside planting, not surveyed tree positions or new land-use data.
   // Shared batches inherit source chunk culling/disposal and never occupy mapped pavement,
