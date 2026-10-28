@@ -22,11 +22,20 @@ export function vehicleOverlap(a:FleetVehicle,b:FleetVehicle,margin=.3){return r
  * These are game vehicle locations, not claims of mapped/legal parking bays. */
 export function placeFleet(data:OsmMap,surface:{roadSurface:(x:number,z:number)=>boolean;isBlocked:(x:number,z:number)=>boolean},auto:DriveState):FleetVehicle[]{
  const fleet:FleetVehicle[]=[{id:'auto',kind:'auto',state:auto,taxiAvailable:false}],obstacles=new TrafficObstacles();obstacles.update(data.buildings);
+ // Streamed maps do not precompute intersections: derive junction degree from
+ // shared OSM node IDs, never from line crossings or duplicate tile fragments.
+ const nodes=new Map<string,{point:{x:number;z:number};neighbors:Set<string>}>();
+ for(const road of data.roads)for(let i=0;i<(road.nodeIds?.length??0);i++){
+  const id=road.nodeIds[i],entry=nodes.get(id)??{point:road.points[i],neighbors:new Set<string>()};
+  if(i)entry.neighbors.add(road.nodeIds[i-1]);if(i+1<road.nodeIds.length)entry.neighbors.add(road.nodeIds[i+1]);nodes.set(id,entry);
+ }
+ const junctions=[...nodes.values()].filter(n=>n.neighbors.size>2).map(n=>n.point);
+ junctions.push(...data.intersections.filter(j=>j.roadIds.length>1));
  for(const kind of ['hatchback','taxi','van'] as const){const spec=VEHICLES[kind],candidates:Array<DriveState & {distance:number}>=[];
  for(const road of data.roads){if(road.width<spec.width+2.3||['motorway','motorway_link','trunk'].includes(road.highway))continue;
  for(let i=1;i<road.points.length;i++){const a=road.points[i-1],b=road.points[i],dx=b.x-a.x,dz=b.z-a.z,len=Math.hypot(dx,dz);if(len<spec.length+4)continue;
  const sign=road.oneway==='-1'?-1:1,heading=Math.atan2(-dx*sign,-dz*sign),lane=road.oneway==='no'?Math.min(road.width/2-spec.width/2-.3,road.width/4):0;
- for(let d=spec.length/2+2;d<len-spec.length/2-2;d+=4){const x=a.x+dx*d/len-Math.cos(heading)*lane,z=a.z+dz*d/len+Math.sin(heading)*lane,distance=Math.hypot(x-auto.x,z-auto.z);if(distance<10||distance>150||data.intersections.some(j=>j.roadIds.length>2&&Math.hypot(j.x-x,j.z-z)<10))continue;candidates.push({x,z,heading,speed:0,steering:0,distance});}
+ for(let d=spec.length/2+2;d<len-spec.length/2-2;d+=4){const x=a.x+dx*d/len-Math.cos(heading)*lane,z=a.z+dz*d/len+Math.sin(heading)*lane,distance=Math.hypot(x-auto.x,z-auto.z),forward=-(x-auto.x)*Math.sin(auto.heading)-(z-auto.z)*Math.cos(auto.heading),lateral=Math.abs((x-auto.x)*Math.cos(auto.heading)-(z-auto.z)*Math.sin(auto.heading));if(forward>0&&forward<45&&lateral<(VEHICLES.auto.width+spec.width)/2+.8)continue;if(distance<10||distance>150||junctions.some(j=>Math.hypot(j.x-x,j.z-z)<10))continue;candidates.push({x,z,heading,speed:0,steering:0,distance});}
  }}candidates.sort((a,b)=>a.distance-b.distance);
  for(const p of candidates){const v:FleetVehicle={id:kind,kind,state:{x:p.x,z:p.z,heading:p.heading,speed:0,steering:0},taxiAvailable:kind==='taxi'};
  if(fleet.some(other=>vehicleOverlap(v,other,2))||obstacles.blocked(p,spec))continue;

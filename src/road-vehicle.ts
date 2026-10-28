@@ -4,7 +4,7 @@ import {VEHICLES} from './fleet';import type {VehicleKind} from './fleet';
 import {createRickshaw} from './vehicle';
 /** Original MIT procedural vehicles. Approximate local silhouettes, not licensed replicas. */
 export function createPlayableVehicle(kind:VehicleKind){
- if(kind==='auto')return {...createRickshaw(),setDoor:(_open:boolean)=>{}};
+ if(kind==='auto')return {...createRickshaw(),setDoor:(_open:boolean,_side=1)=>{}};
  const s=VEHICLES[kind],group=new THREE.Group();group.name=s.name;
  const body=new THREE.MeshStandardMaterial({color:kind==='taxi'?'#f2eee0':kind==='van'?'#b8c8cf':'#d6c4a2',roughness:.48,metalness:.12});
  const dark=new THREE.MeshStandardMaterial({color:'#172724',roughness:.8}),glass=new THREE.MeshStandardMaterial({color:'#355e65',roughness:.23,metalness:.3,transparent:true,opacity:.3,depthWrite:false,side:THREE.DoubleSide});
@@ -34,8 +34,9 @@ export function createPlayableVehicle(kind:VehicleKind){
  box(driver,.33,.44,.25,w*.23,1.03,-.2,shirt);const head=new THREE.Mesh(new THREE.SphereGeometry(.14,10,7),skin);head.position.set(w*.23,1.4,-.2);driver.add(head);
  for(const x of [-w*.24,w*.24]){box(group,.5,.12,.5,x,.73,.1,dark);box(group,.5,.45,.13,x,.95,.35,dark);}
  const steering=new THREE.Mesh(new THREE.TorusGeometry(.16,.025,5,12),dark);steering.position.set(w*.23,1.12,-.58);steering.rotation.x=.8;group.add(steering);
- const door=new THREE.Group();door.name='Animated driver door';door.position.set(w*.46,.84,-roofLength/2+roofZ);group.add(door);
- box(door,.07,.36,roofLength/2-.1,0,0,roofLength/4,body);box(door,.035,h-.96,roofLength/2-.15,0,(h-.85)/2,roofLength/4,glass);box(door,.06,.04,.13,.04,.13,roofLength/2-.18,chrome);
+ const doors:THREE.Group[]=[];
+ for(const side of [-1,1]){const door=new THREE.Group();door.name=side===1?'Animated driver door':'Animated passenger door';door.position.set(side*w*.46,.84,-roofLength/2+roofZ);door.userData.side=side;group.add(door);doors.push(door);
+ box(door,.07,.36,roofLength/2-.1,0,0,roofLength/4,body);box(door,.035,h-.96,roofLength/2-.15,0,(h-.85)/2,roofLength/4,glass);box(door,.06,.04,.13,side*.04,.13,roofLength/2-.18,chrome);}
  if(kind==='taxi'){box(group,.65,.19,.26,0,h+.1,roofZ,new THREE.MeshStandardMaterial({color:'#edbe44',emissive:'#b88d20',emissiveIntensity:.3}));}
  const wheels:THREE.Group[]=[],forks:THREE.Group[]=[];
  for(const side of [-1,1])for(const front of [-1,1]){const pivot=new THREE.Group();pivot.name=front<0?'Front steering wheel':'Rear wheel';pivot.position.set(side*w*.46,.32,front*s.wheelbase/2);group.add(pivot);if(front<0)forks.push(pivot);
@@ -44,6 +45,6 @@ export function createPlayableVehicle(kind:VehicleKind){
  // Material batching leaves doors, steering and wheels independently animated.
  const batches=new Map<THREE.Material,THREE.Mesh[]>();for(const mesh of group.children)if(mesh instanceof THREE.Mesh&&!Array.isArray(mesh.material)){const a=batches.get(mesh.material)??[];a.push(mesh);batches.set(mesh.material,a);}
  for(const [material,meshes] of batches){if(meshes.length<2)continue;const parts=meshes.map(m=>{m.updateMatrix();const g=m.geometry.toNonIndexed();g.applyMatrix4(m.matrix);return g;});const merged=mergeGeometries(parts);if(merged){const mesh=new THREE.Mesh(merged,material);mesh.castShadow=mesh.receiveShadow=true;group.add(mesh);for(const m of meshes){group.remove(m);m.geometry.dispose();}}for(const g of parts)g.dispose();}
- let rotation=0,last=0,opened=false;
- return {group,setOccupied(occupied:boolean){driver.visible=occupied;},setDoor(open:boolean){opened=open;},animate(speed:number,steering:number,elapsed:number,braking=false){const dt=Math.max(0,Math.min(.1,elapsed-last));last=elapsed;rotation-=speed*dt/.32;wheels.forEach(w=>w.rotation.x=rotation);forks.forEach(w=>w.rotation.y=steering);brake.emissiveIntensity=braking?2.5:.35;door.rotation.y+=((opened?-1.05:0)-door.rotation.y)*(1-Math.exp(-dt*12));}};
+ let rotation=0,last=0,opened=false,doorSide=1;
+ return {group,setOccupied(occupied:boolean){driver.visible=occupied;},setDoor(open:boolean,side=1){opened=open;doorSide=side;},animate(speed:number,steering:number,elapsed:number,braking=false){const dt=Math.max(0,Math.min(.1,elapsed-last));last=elapsed;rotation-=speed*dt/.32;wheels.forEach(w=>w.rotation.x=rotation);forks.forEach(w=>w.rotation.y=steering);brake.emissiveIntensity=braking?2.5:.35;for(const door of doors)door.rotation.y+=((opened&&door.userData.side===doorSide?doorSide*1.05:0)-door.rotation.y)*(1-Math.exp(-dt*12));}};
 }

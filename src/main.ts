@@ -190,12 +190,13 @@ try {
     const candidate=foot.active?nearestVehicle():activeVehicle;
     if(!candidate){toast('No available stopped vehicle nearby.');return;}
     interactionVehicle=candidate;
-    const result=foot.mode==='driving'?foot.exit(car):foot.enter(candidate.state);
+    const result=foot.mode==='driving'?foot.exit(car,activeVehicle.kind==='auto'?-1:1):foot.enter(candidate.state);
     if(result==='ok'){
       if(foot.mode==='entering'){
         activeVehicle=candidate;car=candidate.state;rickshaw=models.get(candidate.id)!;rickshaw.group.add(passenger);
       }
-      car.speed=0;models.get(candidate.id)!.setDoor(true);input.clear();
+      const doorPoint=foot.snapshot??foot.pose,doorSide=Math.sign((doorPoint.x-candidate.state.x)*Math.cos(candidate.state.heading)-(doorPoint.z-candidate.state.z)*Math.sin(candidate.state.heading))||1;
+      car.speed=0;models.get(candidate.id)!.setDoor(true,doorSide);input.clear();
       toast(foot.mode==='exiting'?'On foot · walk to an available vehicle and press F.':`Entering ${VEHICLES[candidate.kind].name}.`);
       syncFootSave();syncFleetSave();save();
     }

@@ -14,15 +14,15 @@ export class WalkingController {
  get transition(){return this.mode==='exiting'||this.mode==='entering';}
  get snapshot():MapPoint & {heading:number}|null{return this.mode==='walking'?{x:this.pose.x,z:this.pose.z,heading:this.pose.heading}:this.mode==='exiting'?{x:this.end.x,z:this.end.z,heading:this.pose.heading}:null;}
  restore(save:FootSave){if(this.blocked(save))return false;this.pose={x:save.x,z:save.z,heading:save.heading,speed:0};this.viewHeading=save.heading;this.mode='walking';return true;}
- exit(car:FootPose):'moving'|'blocked'|'transition'|'ok'{
+ exit(car:FootPose,preferredSide=-1):'moving'|'blocked'|'transition'|'ok'{
   if(this.mode!=='driving')return 'transition';if(Math.abs(car.speed)>.2)return 'moving';
   const candidates:Array<MapPoint & {score:number}>=[];
-  for(const side of [-1,1])for(const lateral of [2,2.8,3.6])for(const forward of [0,1.5,-1.5]){
+  for(const side of [preferredSide,-preferredSide])for(const lateral of [2,2.8,3.6])for(const forward of [0,1.5,-1.5]){
    const p={x:car.x+Math.cos(car.heading)*lateral*side-Math.sin(car.heading)*forward,z:car.z-Math.sin(car.heading)*lateral*side-Math.cos(car.heading)*forward};
    const door={x:car.x+Math.cos(car.heading)*.8*side,z:car.z-Math.sin(car.heading)*.8*side};
    let clear=!this.blocked(p);
    for(let t=0;t<=1&&clear;t+=.1)if(this.blocked({x:door.x+(p.x-door.x)*t,z:door.z+(p.z-door.z)*t},true))clear=false;
-   if(clear)candidates.push({...p,score:lateral+Math.abs(forward)*.5+(side===-1?0:.4)});
+   if(clear)candidates.push({...p,score:lateral+Math.abs(forward)*.5+(side===preferredSide?0:.4)});
   }
   candidates.sort((a,b)=>a.score-b.score);if(!candidates.length)return 'blocked';
   this.viewHeading=car.heading;this.pose={x:car.x,z:car.z,heading:car.heading,speed:0};this.start={x:car.x,z:car.z};this.end=candidates[0];this.phase=0;this.mode='exiting';return 'ok';
